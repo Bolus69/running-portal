@@ -98,6 +98,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
   const [feedbackWorkout, setFeedbackWorkout] = useState<PlanWeek['workouts'][number] | null>(null)
   const [feedbackDraft, setFeedbackDraft] = useState<QuickFeedbackDraft>({ effort: '', note: '' })
   const [toast, setToast] = useState('')
+  const [evaluatingSuggestions, setEvaluatingSuggestions] = useState(false)
   const [expandedWorkout, setExpandedWorkout] = useState<string | null>(null)
   const [selectedAthlete, setSelectedAthlete] = useState<AthleteSummary | null>(null)
   const [draft, setDraft] = useState<ManualDraft>({ name: '', date: new Date().toISOString().slice(0, 10), duration: '', distance: '', heartRate: '', effort: '', note: '', plannedWorkoutId: '' })
@@ -366,6 +367,26 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
     return true
   }
 
+  async function evaluateCoachSuggestions() {
+    if (demoMode) return showToast('In dit voorbeeld staan al twee voorstellen klaar om te bekijken.')
+    setEvaluatingSuggestions(true)
+    try {
+      const response = await fetch('/api/coach/suggestions/evaluate', { method: 'POST' })
+      const result = await response.json().catch(() => ({})) as { created?: number; error?: string }
+      if (!response.ok) return showToast(result.error ?? 'Voorstellen controleren lukte niet.')
+      if (result.created) {
+        showToast(result.created + (result.created === 1 ? ' nieuw voorstel toegevoegd.' : ' nieuwe voorstellen toegevoegd.'))
+        router.refresh()
+      } else {
+        showToast('Er is nu geen nieuw voorstel nodig.')
+      }
+    } catch {
+      showToast('Voorstellen controleren lukte niet. Probeer het later opnieuw.')
+    } finally {
+      setEvaluatingSuggestions(false)
+    }
+  }
+
   async function updateSuggestion(suggestion: CoachSuggestion, status: CoachSuggestion['status']) {
     let change: string | undefined
     if (status === 'modified') {
@@ -485,7 +506,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
           {view === 'profile' && <ProfileView data={data} draft={profileDraft} setDraft={setProfileDraft} paces={paces} onSubmit={savePlan} onConnect={() => { if (!demoMode) router.push('/api/strava/connect'); else showToast('Strava koppelen werkt zodra de app-instellingen zijn aangesloten.') }} onSync={syncStrava} onDisconnect={disconnectStrava} demoMode={demoMode} />}
           {view === 'coach' && <CoachView data={data} onAthlete={(athlete) => { setSelectedAthlete(athlete); setView('athlete-detail') }} onSuggestions={() => go('suggestions')} onUpdateSuggestion={updateSuggestion} />}
           {view === 'athletes' && <AthletesView athletes={data.athletes} onAthlete={(athlete) => { setSelectedAthlete(athlete); setView('athlete-detail') }} onInvite={() => setModal('invite')} />}
-          {view === 'suggestions' && <SuggestionsView suggestions={data.suggestions} onUpdate={updateSuggestion} />}
+          {view === 'suggestions' && <SuggestionsView suggestions={data.suggestions} onUpdate={updateSuggestion} onEvaluate={evaluateCoachSuggestions} evaluating={evaluatingSuggestions} />}
           {view === 'athlete-detail' && selectedAthlete && <AthleteDetail athlete={selectedAthlete} data={data} onBack={() => go('athletes')} onSetupPlan={() => openCoachPlan(selectedAthlete)} onAddNote={addCoachNote} />}
         </div>
         <footer className="page-footer"><span>{BRAND.appName} <b>·</b> {BRAND.byline}</span><span>Trainingsschema is een richtlijn, geen diagnose.</span></footer>
@@ -608,8 +629,8 @@ function SuggestionCard({ suggestion, onUpdate, compact = false }: { suggestion:
   return <article className={'suggestion-card' + (compact ? ' compact' : '')}><div className="suggestion-top"><span className="suggestion-avatar">{suggestion.athleteName.split(' ').map((part) => part[0]).join('')}</span><div><strong>{suggestion.athleteName}</strong><span>{dateLabel(suggestion.createdAt, { day: 'numeric', month: 'short' })}</span></div><span className={'suggestion-status status-' + suggestion.status}>{suggestion.status === 'pending' ? 'Te beoordelen' : suggestion.status === 'accepted' ? 'Geaccepteerd' : suggestion.status === 'modified' ? 'Aangepast' : 'Afgewezen'}</span></div><h3>{suggestion.title}</h3><p>{suggestion.reason}</p>{suggestion.replacement && <div className="suggestion-replacement"><span>Voorstel</span><strong>{suggestion.replacement}</strong></div>}{suggestion.status === 'pending' && <div className="suggestion-actions"><button className="button button-primary button-small" onClick={() => onUpdate(suggestion, 'accepted')}>Accepteren</button><button className="button button-outline button-small" onClick={() => onUpdate(suggestion, 'modified')}>Aanpassen</button><button className="text-button subtle" onClick={() => onUpdate(suggestion, 'rejected')}>Afwijzen</button></div>}</article>
 }
 
-function SuggestionsView({ suggestions, onUpdate }: { suggestions: CoachSuggestion[]; onUpdate: (suggestion: CoachSuggestion, status: CoachSuggestion['status']) => void }) {
-  return <section className="suggestions-page"><div className="section-heading"><div><p className="eyebrow">BEOORDELING DOOR DE COACH</p><h2>Wijzigingen blijven jouw keuze</h2></div><span className="proposal-count">{suggestions.filter((item) => item.status === 'pending').length} open</span></div><div className="suggestion-list">{suggestions.map((item) => <SuggestionCard key={item.id} suggestion={item} onUpdate={onUpdate} />)}</div>{suggestions.length === 0 && <div className="empty-state"><h3>Geen voorstellen</h3><p>Als feedback of verloop aandacht vraagt, verschijnt een voorstel hier.</p></div>}</section>
+function SuggestionsView({ suggestions, onUpdate, onEvaluate, evaluating }: { suggestions: CoachSuggestion[]; onUpdate: (suggestion: CoachSuggestion, status: CoachSuggestion['status']) => void; onEvaluate: () => void; evaluating: boolean }) {
+  return <section className="suggestions-page"><div className="section-heading"><div><p className="eyebrow">BEOORDELING DOOR DE COACH</p><h2>Wijzigingen blijven jouw keuze</h2></div><div className="form-actions"><span className="proposal-count">{suggestions.filter((item) => item.status === 'pending').length} open</span><button className="button button-outline button-small" onClick={onEvaluate} disabled={evaluating}>{evaluating ? 'Controleren…' : 'Voorstellen controleren'}</button></div></div><div className="suggestion-list">{suggestions.map((item) => <SuggestionCard key={item.id} suggestion={item} onUpdate={onUpdate} />)}</div>{suggestions.length === 0 && <div className="empty-state"><h3>Geen voorstellen</h3><p>Als feedback of verloop aandacht vraagt, verschijnt een voorstel hier.</p></div>}</section>
 }
 
 function AthleteDetail({ athlete, data, onBack, onSetupPlan, onAddNote }: { athlete: AthleteSummary; data: DashboardData; onBack: () => void; onSetupPlan: () => void; onAddNote: (note: string) => Promise<boolean> }) {
