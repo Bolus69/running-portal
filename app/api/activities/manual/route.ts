@@ -19,6 +19,11 @@ export async function POST(request: Request) {
   const effort = validEfforts.includes(String(body.effort)) ? String(body.effort) : undefined
   const note = typeof body.note === 'string' ? body.note.slice(0, 1000) : undefined
   const averageHeartRate = Number(body.averageHeartRate)
+  const plannedWorkoutId = typeof body.plannedWorkoutId === 'string' && body.plannedWorkoutId ? body.plannedWorkoutId : undefined
+  if (plannedWorkoutId) {
+    const { data: workout } = await supabase.from('planned_workouts').select('id').eq('id', plannedWorkoutId).eq('athlete_id', user.id).maybeSingle()
+    if (!workout) return jsonError('Deze training hoort niet bij jouw schema.', 403)
+  }
   const distanceMeters = Number.isFinite(distanceKm) && distanceKm > 0 ? Math.round(distanceKm * 1000) : null
   const speed = distanceMeters ? distanceMeters / (durationMinutes * 60) : null
   const { data: inserted, error } = await supabase.from('activities').insert({
@@ -55,8 +60,24 @@ export async function POST(request: Request) {
   }).filter((lap) => lap.elapsed_seconds || lap.distance_meters || lap.average_speed_mps || lap.average_heart_rate)
   if (lapRows.length) await supabase.from('activity_laps').insert(lapRows)
 
-  if (typeof body.plannedWorkoutId === 'string' && body.plannedWorkoutId) {
-    await supabase.from('activity_workout_links').insert({ activity_id: String(inserted.id), planned_workout_id: body.plannedWorkoutId, match_method: 'manual', confidence: 1 })
+  let warning: string | undefined
+  if (plannedWorkoutId) {
+    const { error: linkError } = await supabase.from('activity_workout_links').insert({ activity_id: String(inserted.id), planned_workout_id: plannedWorkoutId, match_method: 'manual', confidence: 1 })
+    if (linkError) {
+      warning = 'Training opgeslagen, maar koppelen aan het schema lukte niet.'
+    } else {
+      const { error: feedbackError } = await supabase.from('workout_feedback').upsert({
+        planned_workout_id: plannedWorkoutId,
+        athlete_id: user.id,
+        activity_id: String(inserted.id),
+        state: 'completed',
+        effort: effort ?? null,
+        note: note ?? null,
+        completed_at: startedAt.toISOString(),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'planned_workout_id,athlete_id' })
+      if (feedbackError) warning = 'Training en koppeling opgeslagen, maar de status van de geplande training kon niet worden bijgewerkt.'
+    }
   }
-  return Response.json({ ok: true, activityId: inserted.id }, { status: 201, headers: { 'Cache-Control': 'no-store' } })
+  return Response.json({ ok: true, activityId: inserted.id, warning }, { status: 201, headers: { 'Cache-Control': 'no-store' } })
 }
