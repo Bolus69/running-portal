@@ -67,6 +67,11 @@ export function createDemoData(now = new Date()): DashboardData {
   ]
 
   const currentWeekLabel = phaseLabel(activeWeek.phase)
+  const coachPlans = {
+    sanne: weeks,
+    joris: generatePlan({ marathonDate, length: 16, trainingDays: [2, 4, 0], includeOptionalFourth: true, goalTimeSeconds: 3 * 3600 + 45 * 60 }),
+    noor: generatePlan({ marathonDate, length: 20, trainingDays: [2, 4, 0], includeOptionalFourth: true, goalTimeSeconds: 4 * 3600 + 20 * 60 }),
+  }
   return {
     profile: { id: 'demo-athlete', name: 'Sanne de Vries', role: 'athlete' },
     stravaConnected: true,
@@ -96,6 +101,7 @@ export function createDemoData(now = new Date()): DashboardData {
         lastFeedback: 'Zoals verwacht',
         lastLongRun: 'Vorige zondag · 24 km',
         risk: 'green',
+        planWeeks: coachPlans.sanne,
       },
       {
         id: 'athlete-2',
@@ -112,6 +118,7 @@ export function createDemoData(now = new Date()): DashboardData {
         lastLongRun: 'Vorige zondag · 21 km',
         risk: 'orange',
         reason: 'Kwaliteitstraining voelde zwaarder dan gepland.',
+        planWeeks: coachPlans.joris,
       },
       {
         id: 'athlete-3',
@@ -128,6 +135,7 @@ export function createDemoData(now = new Date()): DashboardData {
         lastLongRun: '2 weken geleden · 18 km',
         risk: 'red',
         reason: 'Twee geplande trainingen staan nog open.',
+        planWeeks: coachPlans.noor,
       },
     ],
     suggestions: [
