@@ -128,9 +128,8 @@ create table public.activities (
   check ((source = 'manual' and external_activity_id is null) or (source = 'strava' and external_activity_id is not null))
 );
 
-create unique index activities_strava_external_id_idx
-  on public.activities (source, external_activity_id)
-  where external_activity_id is not null;
+create unique index activities_source_external_id_idx
+  on public.activities (source, external_activity_id);
 create index activities_athlete_started_idx on public.activities (athlete_id, started_at desc);
 
 create table public.activity_laps (

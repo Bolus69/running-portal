@@ -193,6 +193,8 @@ h1, h2, h3 { font-family: 'Manrope', 'DM Sans', sans-serif; letter-spacing: -.6p
 .page-footer span:last-child { color: #a5ada6; }
 
 .plan-page, .history-page, .athletes-page, .suggestions-page, .athlete-detail-page { max-width: 1020px; }
+.detail-plan-actions { display: flex; justify-content: flex-end; margin: 0 0 12px; }
+@media (max-width: 640px) { .detail-plan-actions > .button { width: 100%; } }
 .plan-overview { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 20px 23px; border-radius: 13px; background: var(--forest); color: #f3f6f1; margin-bottom: 14px; }
 .plan-overview .small-label { color: #abb8ab; font-size: 8px; }
 .plan-overview h2 { margin: 4px 0 4px; font-size: 18px; }
