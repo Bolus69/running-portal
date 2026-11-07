@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { BRAND } from '@/lib/brand'
 import { calculateTrainingPaces, currentWeekNumber, formatPace, generatePlan, parseDurationToSeconds, phaseLabel } from '@/lib/training-plan'
 import type { PlanWeek } from '@/lib/training-plan'
-import type { ActivityLap, AppRole, AthleteSummary, CoachSuggestion, DashboardData, RunActivity, WellnessEntry } from '@/lib/types'
+import type { ActivityLap, AppRole, AthleteSummary, CoachNote, CoachSuggestion, DashboardData, RunActivity, WellnessEntry } from '@/lib/types'
 
 type View = 'week' | 'plan' | 'history' | 'wellness' | 'profile' | 'coach' | 'athletes' | 'suggestions' | 'athlete-detail'
 type ManualDraft = { name: string; date: string; duration: string; distance: string; heartRate: string; effort: string; note: string; plannedWorkoutId: string }
@@ -347,6 +347,25 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
     if (!demoMode) router.refresh()
   }
 
+  async function addCoachNote(note: string): Promise<boolean> {
+    if (!selectedAthlete || !note.trim()) return false
+    let savedNote: CoachNote = { id: 'note-' + Date.now(), note: note.trim(), createdAt: new Date().toISOString() }
+    if (!demoMode) {
+      const response = await fetch('/api/coach/notes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ athleteId: selectedAthlete.id, note: note.trim() }) })
+      const result = await response.json().catch(() => ({})) as { error?: string; note?: { id: string; note: string; createdAt: string } }
+      if (!response.ok || !result.note) {
+        showToast(result.error ?? 'De coachnotitie kon niet worden opgeslagen.')
+        return false
+      }
+      savedNote = result.note
+    }
+    const athleteId = selectedAthlete.id
+    setData((current) => ({ ...current, athletes: current.athletes.map((athlete) => athlete.id === athleteId ? { ...athlete, coachNotes: [savedNote, ...(athlete.coachNotes ?? [])] } : athlete) }))
+    setSelectedAthlete((current) => current?.id === athleteId ? { ...current, coachNotes: [savedNote, ...(current.coachNotes ?? [])] } : current)
+    showToast('Coachnotitie opgeslagen.')
+    return true
+  }
+
   async function updateSuggestion(suggestion: CoachSuggestion, status: CoachSuggestion['status']) {
     let change: string | undefined
     if (status === 'modified') {
@@ -467,7 +486,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
           {view === 'coach' && <CoachView data={data} onAthlete={(athlete) => { setSelectedAthlete(athlete); setView('athlete-detail') }} onSuggestions={() => go('suggestions')} onUpdateSuggestion={updateSuggestion} />}
           {view === 'athletes' && <AthletesView athletes={data.athletes} onAthlete={(athlete) => { setSelectedAthlete(athlete); setView('athlete-detail') }} onInvite={() => setModal('invite')} />}
           {view === 'suggestions' && <SuggestionsView suggestions={data.suggestions} onUpdate={updateSuggestion} />}
-          {view === 'athlete-detail' && selectedAthlete && <AthleteDetail athlete={selectedAthlete} data={data} onBack={() => go('athletes')} onSetupPlan={() => openCoachPlan(selectedAthlete)} />}
+          {view === 'athlete-detail' && selectedAthlete && <AthleteDetail athlete={selectedAthlete} data={data} onBack={() => go('athletes')} onSetupPlan={() => openCoachPlan(selectedAthlete)} onAddNote={addCoachNote} />}
         </div>
         <footer className="page-footer"><span>{BRAND.appName} <b>·</b> {BRAND.byline}</span><span>Trainingsschema is een richtlijn, geen diagnose.</span></footer>
       </main>
