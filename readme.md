@@ -67,15 +67,11 @@ De bestaande `marathon-coach`-database bevat de app-tabellen en beveiligingsrege
 
 ## Strava
 
-De Strava-code is aanwezig, maar OAuth-gegevens moeten nog in Vercel worden ingesteld. Hiervoor is een Strava API-app nodig. Voeg de volgende waarden toe aan **Vercel → running-portal → Settings → Environment Variables**, alleen voor Preview en branch `feat/marathon-coach-mvp`:
+De Strava-koppeling is voorbereid voor een test met je eigen account. De veilige encryptie- en webhook-sleutels staan al als versleutelde omgevingsvariabelen op alleen de Vercel-previewbranch. Voeg zelf alleen `STRAVA_CLIENT_ID` en `STRAVA_CLIENT_SECRET` toe via **Vercel → running-portal → Settings → Environment Variables**, met omgeving **Preview** en branch `feat/marathon-coach-mvp`.
 
-- `STRAVA_CLIENT_ID`
-- `STRAVA_CLIENT_SECRET`
-- `STRAVA_TOKEN_ENCRYPTION_KEY` (genereer een sleutel van 32 bytes, bijvoorbeeld met `openssl rand -base64 32`)
-- `STRAVA_WEBHOOK_SECRET` (alleen nodig voor automatische webhook-synchronisatie)
+Volg daarna de leekvriendelijke handleiding [Strava instellen en testen](docs/strava-preview.md). De eerste koppeling haalt de laatste 30 dagen op; je kunt daarna ook handmatig synchroniseren. De app toont intervalblokken alleen wanneer Strava ze echt terugstuurt.
 
-Gebruik als OAuth-callback `https://<preview-domein>/api/strava/callback`. De atleet koppelt Strava daarna in **Mijn profiel**. Zonder webhook werkt handmatig synchroniseren vanuit de app nog steeds. Strava-blokken worden alleen getoond als Strava ze echt terugstuurt.
-
+Vercel-preview is beschermd. Als de eerste import lukt maar automatische webhook-synchronisatie niet, kan Strava de beschermde previewcallback niet bereiken. De previewbeveiliging en productie zijn bewust niet aangepast.
 ## Lokaal starten
 
 Vereist Node.js 20.9 of hoger.
