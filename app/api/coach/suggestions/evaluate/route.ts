@@ -37,18 +37,21 @@ export async function POST(request: Request) {
   const today = now.toISOString().slice(0, 10)
   const horizon = new Date(now.getTime() + 10 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
   const since = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString()
-  const { data: existingData } = await supabase.from('coach_suggestions').select('athlete_id,planned_workout_id,created_at').eq('coach_id', user.id).gte('created_at', since).limit(200)
+  const { data: existingData, error: existingError } = await supabase.from('coach_suggestions').select('athlete_id,planned_workout_id,created_at').eq('coach_id', user.id).gte('created_at', since).limit(200)
+  if (existingError) return jsonError('Bestaande coachvoorstellen konden niet worden gecontroleerd.', 500)
   const existing = (existingData ?? []) as unknown as Row[]
   let created = 0
 
   for (const athleteId of athleteIds) {
-    const { data: plan } = await supabase.from('training_plans').select('id').eq('athlete_id', athleteId).eq('status', 'active').order('created_at', { ascending: false }).limit(1).maybeSingle()
-    if (!plan) continue
-    const { data: workoutData } = await supabase.from('planned_workouts').select('id,workout_type,workout_date,state,duration_minutes,distance_km,description').eq('plan_id', String(plan.id)).order('workout_date')
+    const { data: plan, error: planError } = await supabase.from('training_plans').select('id').eq('athlete_id', athleteId).eq('status', 'active').order('created_at', { ascending: false }).limit(1).maybeSingle()
+    if (planError || !plan) continue
+    const { data: workoutData, error: workoutError } = await supabase.from('planned_workouts').select('id,workout_type,workout_date,state,duration_minutes,distance_km,description').eq('plan_id', String(plan.id)).order('workout_date')
+    if (workoutError) continue
     const workouts = (workoutData ?? []) as unknown as Workout[]
     if (!workouts.length) continue
     const workoutIds = workouts.map((workout) => workout.id)
-    const { data: feedbackData } = await supabase.from('workout_feedback').select('planned_workout_id,state,effort,completed_at').eq('athlete_id', athleteId).eq('state', 'completed').gte('completed_at', since).in('planned_workout_id', workoutIds)
+    const { data: feedbackData, error: feedbackError } = await supabase.from('workout_feedback').select('planned_workout_id,state,effort,completed_at').eq('athlete_id', athleteId).eq('state', 'completed').gte('completed_at', since).in('planned_workout_id', workoutIds)
+    if (feedbackError) continue
     const feedback = (feedbackData ?? []) as unknown as Row[]
     const completedIds = new Set(feedback.map((item) => String(item.planned_workout_id)))
     const upcoming = workouts.filter((workout) => workout.workout_date >= today && workout.workout_date <= horizon && workout.state !== 'skipped' && !completedIds.has(workout.id))
