@@ -185,12 +185,18 @@ async function loadWellness(supabase: Awaited<ReturnType<typeof import('@/lib/su
 async function loadCoachData(supabase: Awaited<ReturnType<typeof import('@/lib/supabase/server').createServerSupabaseClient>>, userId: string, fullName: string): Promise<DashboardData> {
   const { data: relationshipData } = await supabase.from('coach_athletes').select('athlete_id').eq('coach_id', userId).eq('status', 'active').limit(50)
   const athleteIds = [...new Set(((relationshipData ?? []) as unknown as Row[]).map((item) => String(item.athlete_id)))]
-  const [profileResult, suggestionResult] = await Promise.all([
+  const [profileResult, suggestionResult, noteResult] = await Promise.all([
     athleteIds.length ? supabase.from('profiles').select('id,full_name').in('id', athleteIds) : Promise.resolve({ data: [] }),
     supabase.from('coach_suggestions').select('*').eq('coach_id', userId).order('created_at', { ascending: false }).limit(50),
+    athleteIds.length ? supabase.from('coach_notes').select('id,athlete_id,note,created_at').eq('coach_id', userId).in('athlete_id', athleteIds).order('created_at', { ascending: false }).limit(100) : Promise.resolve({ data: [] }),
   ])
   const profiles = ((profileResult.data ?? []) as unknown as Row[])
   const nameById = new Map(profiles.map((profile) => [String(profile.id), String(profile.full_name ?? 'Atleet')]))
+  const notesByAthlete = new Map<string, { id: string; note: string; createdAt: string }[]>()
+  for (const row of (noteResult.data ?? []) as unknown as Row[]) {
+    const athleteId = String(row.athlete_id)
+    notesByAthlete.set(athleteId, [...(notesByAthlete.get(athleteId) ?? []), { id: String(row.id), note: String(row.note), createdAt: String(row.created_at) }])
+  }
   const athleteData = await Promise.all(athleteIds.map(async (athleteId): Promise<AthleteSummary> => {
     const [plan, activities, wellness] = await Promise.all([loadPlan(supabase, athleteId), loadActivities(supabase, athleteId), loadWellness(supabase, athleteId)])
     const currentWeek = plan?.weeks.find((week) => week.weekNumber === plan.currentWeek)
@@ -219,6 +225,8 @@ async function loadCoachData(supabase: Awaited<ReturnType<typeof import('@/lib/s
       reason: overdue >= 2 ? 'Meerdere trainingen staan na de geplande datum nog open.' : latestActivity?.effort === 'harder' || latestActivity?.effort === 'not_good' ? 'De laatste training voelde zwaarder dan verwacht.' : undefined,
       activities,
       wellness: wellness.filter((entry) => entry.visibleToCoach),
+      coachNotes: notesByAthlete.get(athleteId) ?? [],
+      planWeeks: plan?.weeks ?? [],
     }
   }))
   const suggestions = ((suggestionResult.data ?? []) as unknown as Row[]).map((row) => {
