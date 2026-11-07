@@ -66,6 +66,40 @@ function stravaClientCredentials() {
   return { clientId, clientSecret }
 }
 
+export async function ensureStravaWebhookSubscription(callbackOrigin: string): Promise<void> {
+  const { clientId, clientSecret } = stravaClientCredentials()
+  const verifyToken = process.env.STRAVA_WEBHOOK_SECRET
+  if (!verifyToken) throw new Error('Strava webhook verification is not configured.')
+
+  const credentials = new URLSearchParams({ client_id: clientId, client_secret: clientSecret })
+  const listResponse = await fetch('https://www.strava.com/api/v3/push_subscriptions?' + credentials.toString(), { cache: 'no-store' })
+  if (!listResponse.ok) throw new Error('Existing Strava webhook subscriptions could not be checked.')
+  const existing = await listResponse.json() as Array<{ id?: number; callback_url?: string }>
+  const callback = new URL('/api/strava/webhook', callbackOrigin)
+  callback.searchParams.set('token', verifyToken)
+  const callbackUrl = callback.toString()
+
+  if (Array.isArray(existing) && existing.some((item) => item.callback_url === callbackUrl)) return
+  if (Array.isArray(existing) && existing.length > 0) {
+    throw new Error('A Strava webhook subscription already uses a different callback URL.')
+  }
+
+  const createResponse = await fetch('https://www.strava.com/api/v3/push_subscriptions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      callback_url: callbackUrl,
+      verify_token: verifyToken,
+    }),
+    cache: 'no-store',
+  })
+  if (!createResponse.ok) throw new Error('Strava webhook registration was not accepted.')
+  const subscription = await createResponse.json() as { id?: number }
+  if (!subscription.id) throw new Error('Strava did not confirm the webhook subscription.')
+}
+
 async function refreshAccessToken(admin: AdminClient, athleteId: string, connection: Row): Promise<string> {
   const expiry = new Date(String(connection.expires_at)).getTime()
   const accessToken = decryptStravaToken(String(connection.access_token_enc))

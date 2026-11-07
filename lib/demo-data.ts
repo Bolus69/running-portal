@@ -68,12 +68,12 @@ export function createDemoData(now = new Date()): DashboardData {
 
   const currentWeekLabel = phaseLabel(activeWeek.phase)
   const coachPlans = {
-    sanne: weeks,
+    demo: weeks,
     joris: generatePlan({ marathonDate, length: 16, trainingDays: [2, 4, 0], includeOptionalFourth: true, goalTimeSeconds: 3 * 3600 + 45 * 60 }),
     noor: generatePlan({ marathonDate, length: 20, trainingDays: [2, 4, 0], includeOptionalFourth: true, goalTimeSeconds: 4 * 3600 + 20 * 60 }),
   }
   return {
-    profile: { id: 'demo-athlete', name: 'Sanne de Vries', role: 'athlete' },
+    profile: { id: 'demo-athlete', name: 'Demo-atleet', role: 'athlete' },
     stravaConnected: true,
     plan: {
       length: 16,
@@ -89,7 +89,7 @@ export function createDemoData(now = new Date()): DashboardData {
     athletes: [
       {
         id: 'athlete-1',
-        name: 'Sanne de Vries',
+        name: 'Demo-atleet',
         marathonDate,
         goalTime: '04:00:00',
         planLength: 16,
@@ -101,7 +101,7 @@ export function createDemoData(now = new Date()): DashboardData {
         lastFeedback: 'Zoals verwacht',
         lastLongRun: 'Vorige zondag · 24 km',
         risk: 'green',
-        planWeeks: coachPlans.sanne,
+        planWeeks: coachPlans.demo,
       },
       {
         id: 'athlete-2',

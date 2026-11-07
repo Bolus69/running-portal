@@ -1,14 +1,17 @@
 export type PlanLength = 12 | 16 | 20
 export type Phase = 'basis' | 'ontwikkeling' | 'marathonspecifiek' | 'taper'
 export type WorkoutStatus = 'planned' | 'completed' | 'adjusted' | 'skipped'
+export type All4RunningZone = 1 | 2 | 3 | 4 | 5 | '4-5'
 export type TrainingType = 'easy' | 'quality' | 'long' | 'optional' | 'race'
 
 export type WorkoutStep = {
   kind: 'warmup' | 'easy' | 'work' | 'recovery' | 'cooldown' | 'strides'
   label: string
   durationMinutes?: number
+  durationSeconds?: number
   repeats?: number
   intensity?: 'E' | 'M' | 'T' | 'I' | 'R'
+  all4runningZone?: All4RunningZone
 }
 
 export type PlannedWorkout = {
@@ -47,13 +50,13 @@ export type PlanInput = {
 
 const LONG_RUNS: Record<PlanLength, number[]> = {
   12: [18, 20, 22, 16, 24, 26, 28, 18, 30, 32, 16, 42.2],
-  16: [14, 16, 18, 14, 20, 22, 18, 24, 26, 20, 28, 30, 24, 28, 20, 42.2],
-  20: [12, 14, 16, 14, 18, 20, 16, 22, 24, 18, 26, 28, 20, 30, 32, 24, 28, 20, 14, 42.2],
+  16: [14, 16, 18, 14, 20, 22, 24, 18, 24, 26, 28, 22, 30, 22, 14, 42.2],
+  20: [12, 14, 16, 12, 18, 20, 22, 16, 24, 26, 28, 20, 26, 30, 32, 24, 28, 22, 14, 42.2],
 }
 
 const RECOVERY_WEEKS: Record<PlanLength, number[]> = {
   12: [4, 8],
-  16: [4, 8, 13],
+  16: [4, 8, 12],
   20: [4, 8, 12, 16],
 }
 
@@ -124,21 +127,22 @@ function phaseGoal(phase: Phase, recovery: boolean): string {
 
 function qualitySession(week: number, phase: Phase, recovery: boolean): PlannedWorkout {
   if (recovery || phase === 'taper') {
+    const taper = phase === 'taper'
     return {
       id: 'quality-' + week,
       date: '',
       day: '',
-      title: phase === 'taper' ? 'Korte activatie' : 'Lichte fartlek',
+      title: taper ? 'Korte activatie' : 'Lichte fartlek',
       type: 'quality',
-      durationMinutes: 40,
-      intensity: 'Gecontroleerd · T/R',
-      goal: 'Soepel en ontspannen blijven lopen.',
-      description: 'Houd de inspanning licht. Stop als je techniek of ontspanning verslechtert.',
+      durationMinutes: taper ? 32 : 38,
+      intensity: 'Z2 · licht en ontspannen',
+      goal: 'Een kleine prikkel die past bij herstel en het verdere trainingsplan.',
+      description: 'Houd de vlotte stukken comfortabel. Herstel volledig rustig; maak er geen test van.',
       steps: [
-        { kind: 'warmup', label: 'Rustig inlopen', durationMinutes: 10, intensity: 'E' },
-        { kind: 'work', label: 'Vlotte blokken', durationMinutes: 3, repeats: 4, intensity: 'T' },
-        { kind: 'recovery', label: 'Rustig herstel', durationMinutes: 2, intensity: 'E' },
-        { kind: 'cooldown', label: 'Uitlopen', durationMinutes: 8, intensity: 'E' },
+        { kind: 'warmup', label: 'Rustig inlopen (Z1)', durationMinutes: 10, intensity: 'E', all4runningZone: 1 },
+        { kind: 'work', label: 'Licht vlot', durationMinutes: taper ? 2 : 1, repeats: taper ? 3 : 5, all4runningZone: 2 },
+        { kind: 'recovery', label: 'Rustig herstel (Z1)', durationMinutes: taper ? 2 : 1, repeats: taper ? 2 : 4, intensity: 'E', all4runningZone: 1 },
+        { kind: 'cooldown', label: 'Uitlopen (Z1)', durationMinutes: 10, intensity: 'E', all4runningZone: 1 },
       ],
       status: 'planned',
       optional: false,
@@ -151,63 +155,62 @@ function qualitySession(week: number, phase: Phase, recovery: boolean): PlannedW
       id: 'quality-' + week,
       date: '',
       day: '',
-      title: 'Fartlek · ' + repeats + ' × 1 min vlot',
+      title: 'Fartlek · ' + repeats + ' × 1 min (Z3)',
       type: 'quality',
       durationMinutes: 45,
-      intensity: 'Vlot, met ruime controle · R',
+      intensity: 'Z3 · vlot maar beheerst (I)',
       goal: 'Licht voetenwerk en een ontspannen pasritme oefenen.',
-      description: 'De vlotte minuten zijn geen sprint. Loop de herstelminuten heel rustig.',
+      description: 'Loop de vlotte minuten gelijkmatig, niet als sprint. Neem na ieder blok 1 minuut rustig herstel in Z1.',
       steps: [
-        { kind: 'warmup', label: 'Rustig inlopen', durationMinutes: 12, intensity: 'E' },
-        { kind: 'work', label: 'Vlot lopen', durationMinutes: 1, repeats, intensity: 'R' },
-        { kind: 'recovery', label: 'Rustig herstel', durationMinutes: 1, repeats, intensity: 'E' },
-        { kind: 'cooldown', label: 'Uitlopen', durationMinutes: 12, intensity: 'E' },
+        { kind: 'warmup', label: 'Rustig inlopen (Z1)', durationMinutes: 12, intensity: 'E', all4runningZone: 1 },
+        { kind: 'work', label: 'Vlot lopen', durationMinutes: 1, repeats, intensity: 'I', all4runningZone: 3 },
+        { kind: 'recovery', label: 'Rustig herstel', durationMinutes: 1, repeats, intensity: 'E', all4runningZone: 1 },
+        { kind: 'cooldown', label: 'Uitlopen (Z1)', durationMinutes: 12, intensity: 'E', all4runningZone: 1 },
       ],
       status: 'planned',
       optional: false,
     }
   }
 
-  if (phase === 'ontwikkeling') {
+  if (phase === 'ontwikkeling' || phase === 'marathonspecifiek') {
     const blocks = week % 2 === 0 ? 4 : 3
-    const minutes = week % 2 === 0 ? 6 : 8
+    const minutes = phase === 'marathonspecifiek' ? 8 : week % 2 === 0 ? 6 : 8
     return {
       id: 'quality-' + week,
       date: '',
       day: '',
-      title: 'Drempelblokken · ' + blocks + ' × ' + minutes + ' min',
+      title: (phase === 'marathonspecifiek' ? 'Drempelblokken' : 'Drempelblokken') + ' · ' + blocks + ' × ' + minutes + ' min (Z3)',
       type: 'quality',
-      durationMinutes: 52,
-      intensity: 'Drempel · T',
+      durationMinutes: phase === 'marathonspecifiek' ? 55 : 52,
+      intensity: 'Z3 · gecontroleerde drempel (T)',
       goal: 'Een gelijkmatige, herhaalbare drempelinspanning.',
-      description: 'Loop stevig maar beheerst. Je moet de laatste herhaling technisch goed kunnen afronden.',
+      description: 'Loop stevig maar beheerst. Je moet de laatste herhaling technisch goed kunnen afronden. Dribbel 2 minuten rustig in Z1 tussen de blokken.',
       steps: [
-        { kind: 'warmup', label: 'Rustig inlopen', durationMinutes: 12, intensity: 'E' },
-        { kind: 'work', label: 'Drempelblok', durationMinutes: minutes, repeats: blocks, intensity: 'T' },
-        { kind: 'recovery', label: 'Dribbelpauze', durationMinutes: 2, repeats: blocks - 1, intensity: 'E' },
-        { kind: 'cooldown', label: 'Uitlopen', durationMinutes: 10, intensity: 'E' },
+        { kind: 'warmup', label: 'Rustig inlopen (Z1)', durationMinutes: 12, intensity: 'E', all4runningZone: 1 },
+        { kind: 'work', label: 'Drempelblok', durationMinutes: minutes, repeats: blocks, intensity: 'T', all4runningZone: 3 },
+        { kind: 'recovery', label: 'Dribbelpauze (Z1)', durationMinutes: 2, repeats: blocks - 1, intensity: 'E', all4runningZone: 1 },
+        { kind: 'cooldown', label: 'Uitlopen (Z1)', durationMinutes: 10, intensity: 'E', all4runningZone: 1 },
       ],
       status: 'planned',
       optional: false,
     }
   }
 
-  const blocks = week % 2 === 0 ? 3 : 2
   return {
     id: 'quality-' + week,
     date: '',
     day: '',
-    title: 'Marathonblokken · ' + blocks + ' × 10 min',
+    title: 'Fartlek · gecontroleerde blokken (Z3)',
     type: 'quality',
-    durationMinutes: 55,
-    intensity: 'Marathoninspanning · M',
-    goal: 'Het doeltempo ontspannen en gelijkmatig leren lopen.',
-    description: 'Gebruik de blokken om je marathoninspanning te herkennen. Pas aan bij warmte, wind of vermoeidheid.',
+    durationMinutes: 48,
+    intensity: 'Z3 · vlot en herhaalbaar (I)',
+    goal: 'Een stevige prikkel die je zonder forceren kunt herhalen.',
+    description: 'Houd het tempo gelijkmatig. Neem na ieder blok 1 minuut rustig herstel in Z1.',
     steps: [
-      { kind: 'warmup', label: 'Rustig inlopen', durationMinutes: 12, intensity: 'E' },
-      { kind: 'work', label: 'Marathonblok', durationMinutes: 10, repeats: blocks, intensity: 'M' },
-      { kind: 'recovery', label: 'Rustige dribbel', durationMinutes: 3, repeats: blocks - 1, intensity: 'E' },
-      { kind: 'cooldown', label: 'Uitlopen', durationMinutes: 10, intensity: 'E' },
+      { kind: 'warmup', label: 'Rustig inlopen (Z1)', durationMinutes: 12, intensity: 'E', all4runningZone: 1 },
+      { kind: 'work', label: 'Vlot interval', durationMinutes: 3, repeats: 5, intensity: 'I', all4runningZone: 3 },
+      { kind: 'recovery', label: 'Rustig herstel (Z1)', durationMinutes: 1, repeats: 4, intensity: 'E', all4runningZone: 1 },
+      { kind: 'cooldown', label: 'Uitlopen (Z1)', durationMinutes: 10, intensity: 'E', all4runningZone: 1 },
     ],
     status: 'planned',
     optional: false,
@@ -216,26 +219,36 @@ function qualitySession(week: number, phase: Phase, recovery: boolean): PlannedW
 
 function easySession(week: number, phase: Phase): PlannedWorkout {
   const taper = phase === 'taper'
+  const marathonBlocks = phase === 'marathonspecifiek' && week % 2 === 1
   return {
     id: 'easy-' + week,
     date: '',
     day: '',
-    title: 'Rustige duurloop (E)',
+    title: marathonBlocks ? 'Rustige duurloop + marathontempo' : 'Rustige duurloop (E)',
     type: 'easy',
-    durationMinutes: taper ? 35 : phase === 'basis' ? 50 + Math.min(week, 4) * 5 : 60,
-    intensity: 'Rustig · praattempo',
-    goal: 'Aerobe basis opbouwen zonder onnodige vermoeidheid.',
-    description: 'Je moet in volledige zinnen kunnen praten. Tempo is ondergeschikt aan ontspannen lopen.',
-    steps: [
-      { kind: 'easy', label: 'Rustige duur', durationMinutes: taper ? 30 : 45, intensity: 'E' },
-      { kind: 'strides', label: 'Korte versnellingen', durationMinutes: 1, repeats: taper ? 3 : 4, intensity: 'R' },
-    ],
+    durationMinutes: marathonBlocks ? 55 : taper ? 35 : phase === 'basis' ? 50 + Math.min(week, 4) * 5 : 60,
+    intensity: marathonBlocks ? 'Z1 + Z2 · gecontroleerd marathontempo (M)' : 'Z1 · rustig praattempo (E)',
+    goal: marathonBlocks ? 'Rustig lopen met korte, beheerste blokken op marathoninspanning.' : 'Aerobe basis opbouwen zonder onnodige vermoeidheid.',
+    description: marathonBlocks
+      ? 'Loop de blokken op gevoel en persoonlijk marathontempo. Je ademhaling blijft gecontroleerd; pas aan bij warmte, wind of vermoeidheid.'
+      : 'Je moet in volledige zinnen kunnen praten. Tempo is ondergeschikt aan ontspannen lopen.',
+    steps: marathonBlocks
+      ? [
+          { kind: 'warmup', label: 'Rustige duur (Z1)', durationMinutes: 18, intensity: 'E', all4runningZone: 1 },
+          { kind: 'work', label: 'Marathontempo', durationMinutes: 8, repeats: 2, intensity: 'M', all4runningZone: 2 },
+          { kind: 'recovery', label: 'Rustige dribbel (Z1)', durationMinutes: 3, intensity: 'E', all4runningZone: 1 },
+          { kind: 'cooldown', label: 'Rustig uitlopen (Z1)', durationMinutes: 15, intensity: 'E', all4runningZone: 1 },
+        ]
+      : [
+          { kind: 'easy', label: 'Rustige duur (Z1)', durationMinutes: taper ? 30 : 45, intensity: 'E', all4runningZone: 1 },
+          { kind: 'strides', label: 'Korte versnellingen', durationSeconds: 15, repeats: taper ? 3 : 4, intensity: 'R', all4runningZone: '4-5' },
+        ],
     status: 'planned',
     optional: false,
   }
 }
 
-function longSession(week: number, length: PlanLength, phase: Phase): PlannedWorkout {
+function longSession(week: number, length: PlanLength, phase: Phase, recovery: boolean): PlannedWorkout {
   const distanceKm = LONG_RUNS[length][week - 1]
   if (week === length) {
     return {
@@ -245,18 +258,19 @@ function longSession(week: number, length: PlanLength, phase: Phase): PlannedWor
       title: 'Marathon',
       type: 'race',
       distanceKm: 42.2,
-      intensity: 'Wedstrijdinspanning · M',
+      intensity: 'Marathonpace (M) · op inspanning en doeltempo',
       goal: 'Je marathon lopen met een plan dat past bij jouw voorbereiding.',
       description: 'Start beheerst. Pas tempo en voedingsplan aan op omstandigheden en hoe je je voelt.',
       steps: [
-        { kind: 'warmup', label: 'Rustig voorbereiden', durationMinutes: 10, intensity: 'E' },
-        { kind: 'work', label: 'Marathon', durationMinutes: 1, intensity: 'M' },
+        { kind: 'warmup', label: 'Rustig voorbereiden (Z1)', durationMinutes: 10, intensity: 'E', all4runningZone: 1 },
+        { kind: 'work', label: 'Persoonlijk marathontempo', durationMinutes: 1, intensity: 'M', all4runningZone: 2 },
       ],
       status: 'planned',
       optional: false,
     }
   }
-  const timeCapMinutes = distanceKm >= 32 ? (distanceKm >= 32 ? 180 : undefined) : distanceKm >= 30 ? 165 : undefined
+  const timeCapMinutes = distanceKm >= 32 ? 180 : distanceKm >= 30 ? 165 : undefined
+  const marathonBlock = phase === 'marathonspecifiek' && !recovery && week % 2 === 0
   return {
     id: 'long-' + week,
     date: '',
@@ -265,16 +279,16 @@ function longSession(week: number, length: PlanLength, phase: Phase): PlannedWor
     type: 'long',
     distanceKm,
     timeCapMinutes,
-    intensity: phase === 'marathonspecifiek' ? 'Rustig · eventueel M-blokken' : 'Rustig · praattempo',
+    intensity: marathonBlock ? 'Z1 · met kort Z2-marathonblok (M)' : 'Z1 · rustig praattempo (E)',
     goal: 'Duurvermogen en een ontspannen voedings- en drinkroutine oefenen.',
     description: timeCapMinutes
-      ? 'Houd afstand én tijd als richtlijn. Breek de training af als vermoeidheid of klachten toenemen.'
-      : 'Loop ontspannen. Je hoeft de afstand niet sneller af te leggen dan je herstel toelaat.',
+      ? 'Houd afstand én tijd als richtlijn. Loop rustig; breek af als vermoeidheid of klachten toenemen.'
+      : 'Loop ontspannen in Z1. Je hoeft de afstand niet sneller af te leggen dan je herstel toelaat.',
     steps: [
-      { kind: 'warmup', label: 'Inlopen', durationMinutes: 10, intensity: 'E' },
-      { kind: 'easy', label: 'Rustige duur', durationMinutes: 1, intensity: 'E' },
-      ...(phase === 'marathonspecifiek' && week % 2 === 0
-        ? [{ kind: 'work' as const, label: 'Marathonblok aan het einde', durationMinutes: 15, intensity: 'M' as const }]
+      { kind: 'warmup', label: 'Inlopen (Z1)', durationMinutes: 10, intensity: 'E', all4runningZone: 1 },
+      { kind: 'easy', label: 'Rustige duur (Z1)', durationMinutes: 1, intensity: 'E', all4runningZone: 1 },
+      ...(marathonBlock
+        ? [{ kind: 'work' as const, label: 'Marathonblok aan het einde', durationMinutes: 15, intensity: 'M' as const, all4runningZone: 2 as const }]
         : []),
     ],
     status: 'planned',
@@ -299,7 +313,7 @@ export function generatePlan(input: PlanInput): PlanWeek[] {
     weekStart.setUTCDate(weekStart.getUTCDate() - (input.length - week) * 7)
 
     const trainingDays = [...days].sort((a, b) => (a === 0 ? 6 : a - 1) - (b === 0 ? 6 : b - 1))
-    const sessions: PlannedWorkout[] = [easySession(week, phase), qualitySession(week, phase, isRecoveryWeek), longSession(week, input.length, phase)]
+    const sessions: PlannedWorkout[] = [easySession(week, phase), qualitySession(week, phase, isRecoveryWeek), longSession(week, input.length, phase, isRecoveryWeek)]
 
     sessions.forEach((session, index) => {
       const scheduled = session.type === 'race' ? raceDate : dateInWeek(weekStart, trainingDays[index])
@@ -317,10 +331,10 @@ export function generatePlan(input: PlanInput): PlanWeek[] {
           title: 'Optionele herstelduurloop',
           type: 'optional',
           durationMinutes: 30,
-          intensity: 'Zeer rustig · E',
+          intensity: 'Z1 · zeer rustig (E)',
           goal: 'Extra rustige beweegtijd, alleen als dit goed past bij je herstel.',
           description: 'Sla deze training over als je moe bent of klachten hebt. Voeg geen zware blokken toe.',
-          steps: [{ kind: 'easy', label: 'Rustige herstelduur', durationMinutes: 30, intensity: 'E' }],
+          steps: [{ kind: 'easy', label: 'Rustige herstelduur (Z1)', durationMinutes: 30, intensity: 'E', all4runningZone: 1 }],
           status: 'planned',
           optional: true,
         })

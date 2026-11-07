@@ -23,6 +23,32 @@ describe('marathon training plans', () => {
     expect(weeks.flatMap((week) => week.workouts).filter((workout) => workout.optional).every((workout) => workout.status === 'planned')).toBe(true)
   })
 
+  it('uses All4Running heart-rate zones while keeping Daniels pace labels separate', () => {
+    const weeks = generatePlan({ marathonDate: '2027-04-18', length: 12 })
+    const easy = weeks[0].workouts.find((workout) => workout.type === 'easy')
+    const quality = weeks[0].workouts.find((workout) => workout.type === 'quality')
+    const longRun = weeks[0].workouts.find((workout) => workout.type === 'long')
+    expect(easy?.intensity).toContain('Z1')
+    expect(easy?.steps.some((step) => step.all4runningZone === '4-5' && step.durationSeconds === 15)).toBe(true)
+    expect(quality?.steps.some((step) => step.intensity === 'I' && step.all4runningZone === 3)).toBe(true)
+    expect(quality?.steps.some((step) => step.all4runningZone === 1)).toBe(true)
+    expect(longRun?.steps.every((step) => step.all4runningZone === 1)).toBe(true)
+
+    const specificEasy = weeks[8].workouts.find((workout) => workout.type === 'easy')
+    const specificLong = weeks[9].workouts.find((workout) => workout.type === 'long')
+    expect(specificEasy?.steps.some((step) => step.intensity === 'M' && step.all4runningZone === 2)).toBe(true)
+    expect(specificLong?.distanceKm).toBe(32)
+    expect(specificLong?.timeCapMinutes).toBe(180)
+    expect(specificLong?.steps.some((step) => step.all4runningZone === 2)).toBe(true)
+  })
+
+  it('spaces 16- and 20-week recovery weeks through the build', () => {
+    const plan16 = generatePlan({ marathonDate: '2027-04-18', length: 16 })
+    const plan20 = generatePlan({ marathonDate: '2027-04-18', length: 20 })
+    expect([4, 8, 12].every((week) => plan16[week - 1].isRecoveryWeek)).toBe(true)
+    expect([4, 8, 12, 16].every((week) => plan20[week - 1].isRecoveryWeek)).toBe(true)
+  })
+
   it('rejects an invalid set of fixed training days', () => {
     expect(() => generatePlan({ marathonDate: '2027-04-18', length: 16, trainingDays: [2, 2, 0] })).toThrow('Kies drie verschillende')
   })

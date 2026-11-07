@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { encryptStravaToken, stravaOAuthConfigured, syncStravaActivities } from '@/lib/strava'
+import { encryptStravaToken, ensureStravaWebhookSubscription, stravaOAuthConfigured, syncStravaActivities } from '@/lib/strava'
 
 type TokenResponse = { access_token: string; refresh_token: string; expires_at: number; athlete?: { id?: number }; scope?: string }
 
@@ -60,8 +60,11 @@ export async function GET(request: Request) {
     }, { onConflict: 'athlete_id' })
     if (error) throw new Error('connection save')
     let syncOk = true
+    let webhookReady = true
     try { await syncStravaActivities(admin, user.id) } catch { syncOk = false }
+    try { await ensureStravaWebhookSubscription(origin) } catch { webhookReady = false }
     const destination = new URL(syncOk ? '/?strava=connected' : '/?strava=connected&sync=partial', origin)
+    if (!webhookReady) destination.searchParams.set('webhook', 'setup-failed')
     const response = NextResponse.redirect(destination)
     response.cookies.delete('strava_oauth_state')
     return response

@@ -41,11 +41,12 @@ function Icon({ name, size = 19 }: { name: string; size?: number }) {
 
 function LogoMark({ small = false }: { small?: boolean }) {
   return (
-    <svg className={small ? 'logo-mark logo-mark-small' : 'logo-mark'} viewBox="0 0 48 48" fill="none" role="img" aria-label="Marathon Coach logo">
-      <rect width="48" height="48" rx="15" fill="#17241D" />
-      <circle cx="29" cy="10.5" r="3.5" fill="#C9F36B" />
-      <path d="m25.5 17 6 4-2.8 6.5 7 5M25.5 17l-7 6.2-5 1M29 27.5l-7.8 8-2 4.5M28 21l-8.8 7.2-4 8.5" stroke="#C9F36B" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M8 41h32" stroke="#F7F7F2" strokeWidth="1.6" strokeLinecap="round" opacity=".65" />
+    <svg className={small ? 'logo-mark logo-mark-small' : 'logo-mark'} viewBox="0 0 48 48" fill="none" role="img" aria-label="Marathon Coach by Maarten logo">
+      <rect width="48" height="48" rx="15" fill="#14243A" />
+      <path d="M6.5 32.6c5.6-3.2 11.2-4 17.2-2.6M7 37c8.2-2.4 15.8-2.4 23 .1" stroke="#8FB5D7" strokeWidth="1.6" strokeLinecap="round" opacity=".7" />
+      <circle cx="29.1" cy="9.8" r="3.3" fill="#D5F36B" />
+      <path d="m26.1 15.1-4.4 8 7.2 3.5 5-7.5M22 19.5l-5.5-3.1-4.5 2.5M29 26.4l-8.5 5.5-3.1 6M29.2 26.6l6.5 5.7 4.2.7" stroke="#D5F36B" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M7.5 41c9.6 3.5 22.9 3.7 33-.4" stroke="#F7FAFC" strokeWidth="1.5" strokeLinecap="round" opacity=".76" />
     </svg>
   )
 }
@@ -149,6 +150,33 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
     const timer = window.setTimeout(() => setToast(''), 3200)
     return () => window.clearTimeout(timer)
   }, [toast])
+
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    const status = url.searchParams.get('strava')
+    if (!status) return
+    const webhook = url.searchParams.get('webhook')
+    const sync = url.searchParams.get('sync')
+    const messages: Record<string, string> = {
+      connected: webhook === 'setup-failed'
+        ? 'Strava is gekoppeld en de eerste import is gedaan. Automatische synchronisatie wacht nog op de preview-instelling.'
+        : sync === 'partial'
+          ? 'Strava is gekoppeld. De eerste import kon niet volledig worden afgerond; probeer Nu synchroniseren.'
+          : 'Strava is gekoppeld. De laatste 30 dagen worden ingelezen.',
+      'not-configured': 'Strava is nog niet ingesteld. Voeg eerst je Client ID en Client Secret toe in de Vercel-previewinstellingen.',
+      cancelled: 'De Strava-koppeling is afgebroken. Je bestaande gegevens zijn niet gewijzigd.',
+      error: 'Strava koppelen is niet gelukt. Probeer het opnieuw; je bestaande geschiedenis blijft beschikbaar.',
+    }
+    const message = messages[status]
+    if (message) {
+      const timer = window.setTimeout(() => setToast(message), 0)
+      url.searchParams.delete('strava')
+      url.searchParams.delete('sync')
+      url.searchParams.delete('webhook')
+      window.history.replaceState({}, '', url.pathname + url.search + url.hash)
+      return () => window.clearTimeout(timer)
+    }
+  }, [])
 
   const plan = data.plan
   const activeWeek = useMemo(() => plan?.weeks.find((week) => week.weekNumber === plan.currentWeek) ?? plan?.weeks[0] ?? null, [plan])
@@ -487,7 +515,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
               <section className="week-hero">
                 <div className="week-hero-content"><div className="week-topline"><span className="phase-pill"><i /> {phaseLabel(activeWeek.phase)}</span><span className="week-label">WEEK {String(activeWeek.weekNumber).padStart(2, '0')} <span>/{plan.length}</span></span></div><h2>Stap voor stap<br /><em>naar de start.</em></h2><p>{activeWeek.goal}</p><div className="hero-meta"><span><Icon name="run" size={17} /> Marathon {dateLabel(plan.marathonDate, { day: 'numeric', month: 'short', year: 'numeric' })}</span><span className="hero-meta-divider" /><span>Doel <b>{formatTime(plan.goalTime)}</b></span></div></div>
                 <div className="week-ring-wrap"><div className="week-ring" style={{ '--progress': progress + '%' } as React.CSSProperties}><span>{completedThisWeek}<small>/{requiredThisWeek}</small></span></div><div><strong>trainingen</strong><span>deze week gedaan</span></div></div>
-                <div className="hero-decoration" aria-hidden="true"><span /><span /><span /><span /><span /><span /><span /></div>
+                <a className="hero-photo-credit" href="https://unsplash.com/photos/a-large-group-of-runners-participating-in-a-marathon-race-fW-drUfhcwc" target="_blank" rel="noreferrer" aria-label="Foto van Daniel Stiel via Unsplash">Foto Daniel Stiel / Unsplash</a>
               </section>
 
               <div className="content-grid week-grid">
@@ -540,7 +568,7 @@ function WorkoutCard({ workout, expanded, onExpand, onDone, onSkip }: { workout:
   return <article className={'workout-card' + (expanded ? ' expanded' : '') + (workout.optional ? ' optional-card' : '')}>
     <div className="workout-day"><span>{workout.day.toUpperCase()}</span><strong>{new Date(workout.date + 'T12:00:00').getDate()}</strong><small>{new Intl.DateTimeFormat('nl-NL', { month: 'short' }).format(new Date(workout.date + 'T12:00:00'))}</small></div>
     <div className="workout-main"><div className="workout-title-row"><span className={'workout-type-icon type-' + workout.type}><Icon name={icon} size={16} /></span><h3>{workout.title}</h3>{workout.optional && <span className="optional-tag">Optioneel</span>}<StatusPill status={workout.status} /></div><p className="workout-description">{workout.goal}</p><div className="workout-meta"><span><Icon name="clock" size={14} />{workout.durationMinutes ? workout.durationMinutes + ' min' : workout.distanceKm + ' km'}{workout.timeCapMinutes ? ' · max. ' + workout.timeCapMinutes + ' min' : ''}</span><span className="meta-divider" /><span>{workout.intensity}</span></div>
-      {expanded && <div className="workout-detail"><p>{workout.description}</p><div className="step-list">{workout.steps.map((step, idx) => <div className="step-row" key={idx}><span className="step-index">{String(idx + 1).padStart(2, '0')}</span><span>{step.label}{step.repeats ? ' · ' + step.repeats + '×' : ''}</span><b>{step.durationMinutes ? step.durationMinutes + ' min' : ''}{step.intensity ? ' · ' + step.intensity : ''}</b></div>)}</div>{workout.status === 'planned' && <div className="workout-actions"><button className="button button-primary button-small" onClick={onDone}><Icon name="check" size={15} /> Uitgevoerd</button><button className="text-button subtle" onClick={onSkip}>Overslaan</button></div>}</div>}
+      {expanded && <div className="workout-detail"><p>{workout.description}</p><div className="step-list">{workout.steps.map((step, idx) => <div className="step-row" key={idx}><span className="step-index">{String(idx + 1).padStart(2, '0')}</span><span>{step.label}{step.repeats ? ' · ' + step.repeats + '×' : ''}</span><b>{step.durationSeconds ? step.durationSeconds + ' sec' : step.durationMinutes ? step.durationMinutes + ' min' : ''}{step.intensity ? ' · ' + step.intensity : ''}{step.all4runningZone ? <small className="zone-chip">Z{step.all4runningZone === '4-5' ? '4–5' : step.all4runningZone}</small> : null}</b></div>)}</div>{workout.status === 'planned' && <div className="workout-actions"><button className="button button-primary button-small" onClick={onDone}><Icon name="check" size={15} /> Uitgevoerd</button><button className="text-button subtle" onClick={onSkip}>Overslaan</button></div>}</div>}
     </div><button className="workout-open" aria-label={expanded ? 'Training sluiten' : 'Training bekijken'} onClick={onExpand}><Icon name="chevron" size={18} /></button>
   </article>
 }
@@ -606,7 +634,7 @@ function ProfileView({ data, draft, setDraft, paces, onSubmit, onConnect, onSync
     if (selected.length <= 3) setDraft({ ...draft, days: selected })
   }
   return <div className="profile-layout"><form className="profile-form-card" onSubmit={onSubmit}><div className="section-heading"><div><p className="eyebrow">MARATHONINSTELLINGEN</p><h2>Jouw startpunt</h2></div><span className="profile-avatar">{data.profile.name.charAt(0)}</span></div><label className="field full"><span>Naam</span><input value={data.profile.name} readOnly /></label><div className="form-row"><label className="field"><span>Marathondatum</span><input type="date" required value={draft.marathonDate} onChange={(event) => setDraft({ ...draft, marathonDate: event.target.value })} /></label><label className="field"><span>Gewenste streeftijd <small>uu:mm:ss</small></span><input required pattern="\d{2}:\d{2}:\d{2}" value={draft.goalTime} onChange={(event) => setDraft({ ...draft, goalTime: event.target.value })} placeholder="04:00:00" /></label></div><div className="field full"><span>Planlengte</span><div className="plan-length-options">{([12, 16, 20] as const).map((length) => <button type="button" key={length} className={draft.planLength === length ? 'selected' : ''} onClick={() => setDraft({ ...draft, planLength: length })}><strong>{length}</strong><span>weken</span></button>)}</div></div><div className="field full"><span>Vaste trainingsdagen <small>kies er precies drie</small></span><div className="day-options">{days.map((day) => <button type="button" key={day.value} className={draft.days.includes(day.value) ? 'selected' : ''} onClick={() => toggleDay(day.value)}>{day.label}</button>)}</div></div><label className="optional-setting"><input type="checkbox" checked={draft.optional} onChange={(event) => setDraft({ ...draft, optional: event.target.checked })} /><span><strong>Optionele vierde training beschikbaar</strong><small>Rustige herstelduurloop of korte techniektraining.</small></span></label><div className="field full"><span>Recente wedstrijdtijd <small>voor een eerste tempo-indicatie</small></span><div className="form-row"><input type="number" min="1" step="0.1" aria-label="Wedstrijdafstand in kilometers" value={draft.raceDistance} onChange={(event) => setDraft({ ...draft, raceDistance: event.target.value })} /><input value={draft.raceTime} aria-label="Wedstrijdtijd" onChange={(event) => setDraft({ ...draft, raceTime: event.target.value })} placeholder="00:50:00" /></div></div><div className="pace-preview"><div><span className="small-label">EERSTE TEMPO-INDICATIE</span><span className="pace-preview-note">Richtlijn op basis van je wedstrijdresultaat; pas aan op gevoel en omstandigheden.</span></div>{paces ? <div className="pace-preview-grid"><span><small>E</small><b>{formatPace(paces.easy[0])}–{formatPace(paces.easy[1])}</b></span><span><small>M</small><b>{formatPace(paces.marathon)}</b></span><span><small>T</small><b>{formatPace(paces.threshold[0])}–{formatPace(paces.threshold[1])}</b></span><span><small>I</small><b>{formatPace(paces.interval[0])}–{formatPace(paces.interval[1])}</b></span></div> : <p className="muted">Vul een geldig resultaat in om een indicatie te zien.</p>}</div><button className="button button-primary">Plan opslaan <Icon name="arrow" size={16} /></button></form>
-    <aside className="profile-side"><div className="strava-card"><div className="strava-logo"><span className="strava-mark">S</span><div><strong>Strava</strong><span>{data.stravaConnected ? 'Verbonden' : demoMode && data.activities.some((activity) => activity.source === 'strava') ? 'Verbonden in voorbeeld' : 'Nog niet gekoppeld'}</span></div></div><p>Activiteiten worden automatisch opgehaald. Beschikbare laps of blokken worden getoond; zonder die gegevens blijft de totale training zichtbaar.</p>{data.stravaConnected && !demoMode ? <div className="strava-actions"><button type="button" className="button button-outline full-width" onClick={onSync}><Icon name="history" size={16} /> Nu synchroniseren</button><button type="button" className="text-button subtle" onClick={onDisconnect}>Koppeling verwijderen</button></div> : <button type="button" className="button button-outline full-width" onClick={onConnect}><Icon name="link" size={16} /> Strava koppelen</button>}<small>Je Strava-wachtwoord wordt nooit opgeslagen.</small></div><div className="profile-help"><span className="aside-icon lime"><Icon name="spark" /></span><h3>Gebruik je tempozones flexibel</h3><p>Tempo is een hulpmiddel. Hartslag, praattempo, ervaren inspanning en omstandigheden geven extra context.</p><PaceStrip /></div><div className="profile-footnote"><Icon name="shield" size={16} /><span>Je account en trainingsgegevens zijn alleen zichtbaar volgens de coach-atleettoewijzing.</span></div></aside></div>
+    <aside className="profile-side"><div className="strava-card"><div className="strava-logo"><span className="strava-mark">S</span><div><strong>Strava</strong><span>{data.stravaConnected ? 'Verbonden' : demoMode && data.activities.some((activity) => activity.source === 'strava') ? 'Verbonden in voorbeeld' : 'Nog niet gekoppeld'}</span></div></div><p>Activiteiten worden automatisch opgehaald. Beschikbare laps of blokken worden getoond; zonder die gegevens blijft de totale training zichtbaar.</p>{data.stravaConnected && !demoMode ? <div className="strava-actions"><button type="button" className="button button-outline full-width" onClick={onSync}><Icon name="history" size={16} /> Nu synchroniseren</button><button type="button" className="text-button subtle" onClick={onDisconnect}>Koppeling verwijderen</button></div> : <button type="button" className="button button-outline full-width" onClick={onConnect}><Icon name="link" size={16} /> Strava koppelen</button>}<small>Je Strava-wachtwoord wordt nooit opgeslagen.</small></div><div className="profile-help"><span className="aside-icon lime"><Icon name="spark" /></span><h3>Gebruik je tempozones flexibel</h3><p>Tempo is een hulpmiddel. Hartslag, praattempo, ervaren inspanning en omstandigheden geven extra context.</p><PaceStrip /></div><details className="zone-reference"><summary><span><strong>Hartslagzones volgens All4Running</strong><small>Open voor uitleg en praattempo</small></span><Icon name="chevron" size={18} /></summary><div className="zone-reference-list"><div><b>Z1</b><span><strong>Rustig</strong><small>&lt;75% · makkelijk praten</small></span></div><div><b>Z2</b><span><strong>Gecontroleerd</strong><small>75–82% · zinnen worden korter</small></span></div><div><b>Z3</b><span><strong>Vlot / drempel</strong><small>82–88% · korte zinnen</small></span></div><div><b>Z4</b><span><strong>Intensief</strong><small>89–92% · enkele woorden</small></span></div><div><b>Z5</b><span><strong>Korte versnelling</strong><small>&gt;92% · zwaar hijgen</small></span></div></div><p className="zone-note">Percentages zijn een richtlijn op basis van maximale hartslag. Gebruik ook je ademhaling en ervaren inspanning; hartslag hoeft niet ingevuld te zijn.</p><a className="zone-source" href="https://all4running.nl/blog/app/uploads/2025/05/HardloopschemaMarathonGevorderd.pdf" target="_blank" rel="noreferrer">Bekijk het All4Running-uitgangsschema <span>↗</span></a></details><div className="profile-footnote"><Icon name="shield" size={16} /><span>Je account en trainingsgegevens zijn alleen zichtbaar volgens de coach-atleettoewijzing.</span></div></aside></div>
 }
 
 function CoachView({ data, onAthlete, onSuggestions, onUpdateSuggestion }: { data: DashboardData; onAthlete: (athlete: AthleteSummary) => void; onSuggestions: () => void; onUpdateSuggestion: (suggestion: CoachSuggestion, status: CoachSuggestion['status']) => void }) {

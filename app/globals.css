@@ -1,24 +1,24 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
 
 :root {
-  --ink: #1d2a22;
-  --ink-soft: #49574d;
-  --muted: #7b857e;
-  --muted-light: #a9b0aa;
-  --paper: #f7f8f4;
+  --ink: #17283A;
+  --ink-soft: #405266;
+  --muted: #5D6D7E;
+  --muted-light: #738294;
+  --paper: #F4F7FA;
   --white: #fff;
-  --line: #e8ebe5;
-  --line-dark: #344038;
-  --forest: #17241d;
-  --forest-light: #24342a;
-  --lime: #c9f36b;
-  --lime-soft: #edf7d7;
-  --orange: #ef9e61;
-  --orange-soft: #fbefe4;
-  --lavender: #c4bdf2;
-  --lavender-soft: #f1effb;
-  --green: #4e9a68;
-  --shadow: 0 12px 30px rgba(21, 36, 28, .055);
+  --line: #E0E7EE;
+  --line-dark: #2D4058;
+  --forest: #14243A;
+  --forest-light: #203956;
+  --lime: #D5F36B;
+  --lime-soft: #EFF8D7;
+  --orange: #E98647;
+  --orange-soft: #FFF1E6;
+  --lavender: #C1C9F2;
+  --lavender-soft: #F1F2FC;
+  --green: #337C54;
+  --shadow: 0 12px 30px rgba(20, 36, 58, .075);
 }
 
 * { box-sizing: border-box; }
@@ -284,4 +284,100 @@ h1, h2, h3 { font-family: 'Manrope', 'DM Sans', sans-serif; letter-spacing: -.6p
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
+
+/* Marathon Coach visual refresh: clearer contrast, calmer navy and lime, readable training zones. */
+body { font-size: 15px; line-height: 1.6; }
+.page-subtitle { color: #5D6D7E; font-size: 13px; line-height: 1.55; }
+.eyebrow, .sidebar-section-label, .small-label { color: #657587; font-size: 10px; letter-spacing: 1.05px; }
+.sidebar-section-label, .small-label { color: #A8B6C4; }
+.week-hero {
+  min-height: 282px;
+  background: linear-gradient(100deg, rgba(20,36,58,.98) 0%, rgba(20,36,58,.9) 47%, rgba(20,36,58,.42) 100%),
+    url("https://images.unsplash.com/photo-1777788613992-5f2655a97e72?auto=format&fit=crop&w=1600&q=85") center 43% / cover no-repeat,
+    #14243A;
+  box-shadow: 0 18px 42px rgba(20,36,58,.18);
+}
+.week-hero-content { max-width: 650px; }
+.week-hero::after { display: none; }
+.hero-photo-credit {
+  position: absolute;
+  right: 17px;
+  bottom: 13px;
+  z-index: 2;
+  color: rgba(255,255,255,.84);
+  text-decoration: none;
+  font-size: 10px;
+  letter-spacing: .02em;
+  text-shadow: 0 1px 4px rgba(0,0,0,.42);
+}
+.hero-photo-credit:hover { color: #fff; text-decoration: underline; text-underline-offset: 3px; }
+.week-hero .phase-pill { background: rgba(213,243,107,.17); border-color: rgba(213,243,107,.3); color: #E4F7B3; }
+.week-hero .week-ring { background: conic-gradient(var(--lime) var(--progress), rgba(255,255,255,.2) 0); }
+.workout-card { border-color: #DDE5EC; box-shadow: 0 5px 16px rgba(20,36,58,.035); }
+.workout-card:hover, .workout-card.expanded { border-color: #BCC9D5; box-shadow: 0 12px 28px rgba(20,36,58,.09); }
+.workout-description { color: #58697B; font-size: 12px; line-height: 1.55; }
+.workout-meta { color: #4C5D70; font-size: 11px; line-height: 1.5; }
+.workout-title-row h3 { color: #17283A; font-size: 14px; }
+.workout-detail > p { color: #506174; font-size: 12px; line-height: 1.6; }
+.step-row { color: #405266; font-size: 12px; line-height: 1.5; }
+.step-row b { color: #293C50; font-size: 11px; white-space: nowrap; }
+.zone-chip {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #EFF8D7;
+  color: #385431;
+  font-size: 10px;
+  line-height: 1.4;
+  font-weight: 800;
+  vertical-align: 1px;
+}
+.button-primary { color: #152536; }
+.nav-item.active { background: #203956; }
+.mobile-nav button.active { color: #203956; background: #EFF8D7; }
+.zone-reference {
+  padding: 15px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 6px 18px rgba(20,36,58,.035);
+}
+.zone-reference summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.zone-reference summary::-webkit-details-marker { display: none; }
+.zone-reference summary > span { display: grid; gap: 3px; }
+.zone-reference summary strong { color: var(--ink); font-size: 13px; }
+.zone-reference summary small { color: var(--muted); font-size: 11px; }
+.zone-reference summary > svg { color: #738294; transition: transform .16s ease; }
+.zone-reference[open] summary > svg { transform: rotate(180deg); }
+.zone-reference-list { display: grid; gap: 6px; margin-top: 14px; }
+.zone-reference-list > div { display: grid; grid-template-columns: 35px minmax(0,1fr); gap: 9px; align-items: center; padding: 7px 8px; border-radius: 8px; background: #F5F8FA; }
+.zone-reference-list > div > b { display: grid; place-items: center; min-height: 28px; border-radius: 7px; background: #EFF8D7; color: #34502B; font-family: 'Manrope', sans-serif; font-size: 11px; }
+.zone-reference-list > div > span { display: grid; gap: 1px; }
+.zone-reference-list strong { color: #33475B; font-size: 11px; }
+.zone-reference-list small { color: #637386; font-size: 10px; }
+.zone-note { margin: 12px 0 8px; color: #637386; font-size: 10px; line-height: 1.55; }
+.zone-source { color: #355D2E; font-size: 10px; font-weight: 700; text-decoration: none; }
+.zone-source:hover { text-decoration: underline; text-underline-offset: 3px; }
+.strava-card > p, .profile-help > p { color: #58697B; font-size: 12px; line-height: 1.6; }
+.profile-footnote { color: #526477; font-size: 11px; line-height: 1.55; }
+.next-card .muted { color: #58697B; font-size: 12px; line-height: 1.6; }
+.stat-copy > span { color: #667789; }
+@media (max-width: 620px) {
+  body { font-size: 14px; }
+  .page-subtitle { font-size: 12px; }
+  .eyebrow, .sidebar-section-label, .small-label { font-size: 9px; }
+  .week-hero { min-height: 270px; padding: 21px 19px 46px; background-position: center 43%; }
+  .week-hero-content { max-width: 100%; }
+  .week-ring-wrap { margin-top: -2px; }
+  .hero-photo-credit { right: 12px; bottom: 10px; font-size: 9px; }
+  .workout-description, .workout-detail > p { font-size: 11px; }
+  .workout-meta { font-size: 10px; }
+  .step-row { font-size: 11px; }
+  .step-row b { font-size: 10px; }
+  .zone-chip { font-size: 9px; }
+  .zone-reference { padding: 13px; }
 }
