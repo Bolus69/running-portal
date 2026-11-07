@@ -68,4 +68,4 @@ npm run build      # productiebuild controleren
 
 ## Vercel
 
-Koppel de repository aan Vercel en zet de omgevingsvariabelen eerst in **Preview**. Test de preview en de Supabase-redirects voordat je een productieomgeving instelt. Deze branch is bedoeld voor ontwikkeling; er is geen productie-release vanuit deze opdracht.
+De repository is gekoppeld aan het Vercel-project `running-portal`. Commits op `feat/marathon-coach-mvp` horen als preview te worden getest; `main` blijft de productiebranch. Zet eventuele omgevingsvariabelen eerst in **Preview** en controleer ook de Supabase-redirects. Promoveer een preview pas na aparte beoordeling naar productie.
