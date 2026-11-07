@@ -8,7 +8,8 @@ import type { PlanWeek } from '@/lib/training-plan'
 import type { ActivityLap, AppRole, AthleteSummary, CoachSuggestion, DashboardData, RunActivity, WellnessEntry } from '@/lib/types'
 
 type View = 'week' | 'plan' | 'history' | 'wellness' | 'profile' | 'coach' | 'athletes' | 'suggestions' | 'athlete-detail'
-type ManualDraft = { name: string; date: string; duration: string; distance: string; heartRate: string; effort: string; note: string }
+type ManualDraft = { name: string; date: string; duration: string; distance: string; heartRate: string; effort: string; note: string; plannedWorkoutId: string }
+type QuickFeedbackDraft = { effort: NonNullable<RunActivity['effort']> | ''; note: string }
 type WellnessDraft = { sleepHours: string; restingHeartRate: string; recoveryScore: string; note: string; visibleToCoach: boolean }
 type ProfileDraft = { marathonDate: string; goalTime: string; planLength: 12 | 16 | 20; days: number[]; optional: boolean; raceTime: string; raceDistance: string }
 
@@ -93,11 +94,13 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
   const [data, setData] = useState(initialData)
   const [role, setRole] = useState<AppRole>(initialData.profile.role)
   const [view, setView] = useState<View>(initialData.profile.role === 'coach' ? 'coach' : 'week')
-  const [modal, setModal] = useState<'activity' | 'invite' | 'plan' | null>(null)
+  const [modal, setModal] = useState<'activity' | 'invite' | 'plan' | 'feedback' | null>(null)
+  const [feedbackWorkout, setFeedbackWorkout] = useState<PlanWeek['workouts'][number] | null>(null)
+  const [feedbackDraft, setFeedbackDraft] = useState<QuickFeedbackDraft>({ effort: '', note: '' })
   const [toast, setToast] = useState('')
   const [expandedWorkout, setExpandedWorkout] = useState<string | null>(null)
   const [selectedAthlete, setSelectedAthlete] = useState<AthleteSummary | null>(null)
-  const [draft, setDraft] = useState<ManualDraft>({ name: '', date: new Date().toISOString().slice(0, 10), duration: '', distance: '', heartRate: '', effort: 'as_expected', note: '' })
+  const [draft, setDraft] = useState<ManualDraft>({ name: '', date: new Date().toISOString().slice(0, 10), duration: '', distance: '', heartRate: '', effort: '', note: '', plannedWorkoutId: '' })
   const [lapDrafts, setLapDrafts] = useState<ActivityLap[]>([])
   const [wellnessDraft, setWellnessDraft] = useState<WellnessDraft>({ sleepHours: '', restingHeartRate: '', recoveryScore: '', note: '', visibleToCoach: true })
   const [profileDraft, setProfileDraft] = useState<ProfileDraft>({ marathonDate: initialData.plan?.marathonDate ?? '', goalTime: initialData.plan?.goalTime ?? '', planLength: initialData.plan?.length ?? 16, days: initialData.plan?.trainingDays ?? [2, 4, 0], optional: initialData.plan?.includeOptionalFourth ?? false, raceTime: '50:00', raceDistance: '10' })
@@ -157,14 +160,38 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
   const showToast = (message: string) => setToast(message)
   const go = (next: View) => { setView(next); setSelectedAthlete(null) }
 
-  function updateWorkout(workoutId: string, status: 'completed' | 'skipped') {
+  function openWorkoutFeedback(workout: PlanWeek['workouts'][number]) {
+    setFeedbackWorkout(workout)
+    setFeedbackDraft({ effort: '', note: '' })
+    setModal('feedback')
+  }
+
+  async function saveWorkoutFeedback(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!feedbackWorkout) return
+    const payload = { workoutId: feedbackWorkout.id, status: 'completed', effort: feedbackDraft.effort || undefined, note: feedbackDraft.note.trim() || undefined }
+    if (!demoMode) {
+      const response = await fetch('/api/workouts/status', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      if (!response.ok) return showToast('De trainingsstatus kon niet worden opgeslagen. Probeer het opnieuw.')
+    }
+    setData((current) => ({
+      ...current,
+      plan: current.plan ? { ...current.plan, weeks: current.plan.weeks.map((week) => ({ ...week, workouts: week.workouts.map((workout) => workout.id === feedbackWorkout.id ? { ...workout, status: 'completed' } : workout) })) } : null,
+    }))
+    setModal(null)
+    setFeedbackWorkout(null)
+    showToast('Training als uitgevoerd gemarkeerd.')
+  }
+
+  async function updateWorkout(workoutId: string, status: 'completed' | 'skipped') {
+    if (!demoMode) {
+      const response = await fetch('/api/workouts/status', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ workoutId, status }) })
+      if (!response.ok) return showToast('De trainingsstatus kon niet worden opgeslagen. Probeer het opnieuw.')
+    }
     setData((current) => ({
       ...current,
       plan: current.plan ? { ...current.plan, weeks: current.plan.weeks.map((week) => ({ ...week, workouts: week.workouts.map((workout) => workout.id === workoutId ? { ...workout, status } : workout) })) } : null,
     }))
-    if (!demoMode) {
-      void fetch('/api/workouts/status', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ workoutId, status }) })
-    }
     showToast(status === 'completed' ? 'Training als uitgevoerd gemarkeerd.' : 'Training als overgeslagen gemarkeerd.')
   }
 
@@ -183,18 +210,34 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
       pace: Number.isFinite(distanceKm) && distanceKm > 0 ? formatPace((durationMinutes * 60) / distanceKm) : undefined,
       averageHeartRate: Number(draft.heartRate) > 0 ? Number(draft.heartRate) : undefined,
       source: 'manual',
-      effort: draft.effort as RunActivity['effort'],
+      effort: draft.effort ? draft.effort as RunActivity['effort'] : undefined,
       note: draft.note.trim() || undefined,
+      plannedWorkoutId: draft.plannedWorkoutId || undefined,
       laps: lapDrafts.length ? lapDrafts.map((lap, index) => ({ ...lap, id: 'manual-lap-' + Date.now() + '-' + index })) : undefined,
     }
     if (!demoMode) {
       const response = await fetch('/api/activities/manual', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(activity) })
-      if (!response.ok) return showToast('Opslaan lukte niet. Probeer het opnieuw.')
+      const result = await response.json().catch(() => ({})) as { warning?: string; error?: string }
+      if (!response.ok) return showToast(result.error ?? 'Opslaan lukte niet. Probeer het opnieuw.')
+      setData((current) => ({
+        ...current,
+        activities: [activity, ...current.activities],
+        plan: current.plan && activity.plannedWorkoutId ? { ...current.plan, weeks: current.plan.weeks.map((week) => ({ ...week, workouts: week.workouts.map((workout) => workout.id === activity.plannedWorkoutId ? { ...workout, status: 'completed' } : workout) })) } : current.plan,
+      }))
+      setModal(null)
+      setLapDrafts([])
+      setDraft({ name: '', date: new Date().toISOString().slice(0, 10), duration: '', distance: '', heartRate: '', effort: '', note: '', plannedWorkoutId: '' })
+      showToast(result.warning ?? 'Training toegevoegd aan je geschiedenis.')
+      return
     }
-    setData((current) => ({ ...current, activities: [activity, ...current.activities] }))
+    setData((current) => ({
+      ...current,
+      activities: [activity, ...current.activities],
+      plan: current.plan && activity.plannedWorkoutId ? { ...current.plan, weeks: current.plan.weeks.map((week) => ({ ...week, workouts: week.workouts.map((workout) => workout.id === activity.plannedWorkoutId ? { ...workout, status: 'completed' } : workout) })) } : current.plan,
+    }))
     setModal(null)
     setLapDrafts([])
-    setDraft({ name: '', date: new Date().toISOString().slice(0, 10), duration: '', distance: '', heartRate: '', effort: 'as_expected', note: '' })
+    setDraft({ name: '', date: new Date().toISOString().slice(0, 10), duration: '', distance: '', heartRate: '', effort: '', note: '', plannedWorkoutId: '' })
     showToast('Training toegevoegd aan je geschiedenis.')
   }
 
@@ -408,7 +451,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
               </section>
 
               <div className="content-grid week-grid">
-                <section className="section-main"><div className="section-heading"><div><p className="eyebrow">JOUW PLANNING</p><h2>Deze week</h2></div><button className="text-button" onClick={() => go('plan')}>Hele schema <Icon name="arrow" size={16} /></button></div><div className="workout-list">{activeWeek.workouts.map((workout) => <WorkoutCard key={workout.id} workout={workout} expanded={expandedWorkout === workout.id} onExpand={() => setExpandedWorkout(expandedWorkout === workout.id ? null : workout.id)} onDone={() => updateWorkout(workout.id, 'completed')} onSkip={() => updateWorkout(workout.id, 'skipped')} />)}</div></section>
+                <section className="section-main"><div className="section-heading"><div><p className="eyebrow">JOUW PLANNING</p><h2>Deze week</h2></div><button className="text-button" onClick={() => go('plan')}>Hele schema <Icon name="arrow" size={16} /></button></div><div className="workout-list">{activeWeek.workouts.map((workout) => <WorkoutCard key={workout.id} workout={workout} expanded={expandedWorkout === workout.id} onExpand={() => setExpandedWorkout(expandedWorkout === workout.id ? null : workout.id)} onDone={() => openWorkoutFeedback(workout)} onSkip={() => updateWorkout(workout.id, 'skipped')} />)}</div></section>
                 <aside className="section-aside"><div className="next-card"><div className="aside-card-head"><span className="aside-icon lime"><Icon name="spark" size={17} /></span><span className="small-label">VOLGENDE TRAINING</span></div>{nextTraining ? <><p className="next-date">{dateLabel(nextTraining.date)}</p><h3>{nextTraining.title}</h3><p className="muted">{nextTraining.description}</p><div className="next-details"><span>{nextTraining.durationMinutes ? nextTraining.durationMinutes + ' min' : nextTraining.distanceKm + ' km'}</span><span>{nextTraining.intensity}</span></div><button className="button button-dark full-width" onClick={() => { setExpandedWorkout(nextTraining.id); window.scrollTo({ top: 550, behavior: 'smooth' }) }}>Training bekijken <Icon name="arrow" size={16} /></button></> : <div className="empty-small"><strong>Alles gedaan</strong><span>Je trainingen voor deze week zijn afgerond.</span></div>}</div>
                   <div className="pace-card"><div className="aside-card-head"><span className="aside-icon light"><Icon name="run" size={17} /></span><span className="small-label">TRAININGSINTENSITEIT</span></div><p>Gebruik tempo als richtlijn. Je gevoel en de omstandigheden tellen mee.</p><PaceStrip /><button className="text-button" onClick={() => go('profile')}>Mijn tempozones <Icon name="arrow" size={16} /></button></div>
                   <div className="wellness-nudge"><span className="wellness-nudge-icon"><Icon name="heart" /></span><div><strong>Hoe is je herstel?</strong><span>Alleen als je wilt delen.</span></div><button aria-label="Herstel invullen" onClick={() => go('wellness')}><Icon name="arrow" size={17} /></button></div>
@@ -431,9 +474,11 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
 
       <nav className="mobile-nav" aria-label="Mobiele navigatie">{navItems.slice(0, 4).map((item) => <button key={item.id} className={view === item.id ? 'active' : ''} onClick={() => go(item.id)}><Icon name={item.icon} size={19} /><span>{item.label}</span></button>)}</nav>
 
-      {modal === 'activity' && <Modal title="Training toevoegen" subtitle="Vul alleen de gegevens in die je bij de hand hebt." onClose={() => setModal(null)}><form className="form-grid" onSubmit={saveManualActivity}><label className="field full"><span>Naam activiteit</span><input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} placeholder="Bijvoorbeeld rustige duurloop" /></label><label className="field"><span>Datum</span><input type="date" required value={draft.date} onChange={(event) => setDraft({ ...draft, date: event.target.value })} /></label><label className="field"><span>Duur in minuten *</span><input type="number" min="1" required value={draft.duration} onChange={(event) => setDraft({ ...draft, duration: event.target.value })} placeholder="52" /></label><label className="field"><span>Afstand in km</span><input type="number" min="0" step="0.01" value={draft.distance} onChange={(event) => setDraft({ ...draft, distance: event.target.value })} placeholder="9,8" /></label><label className="field"><span>Gem. hartslag</span><input type="number" min="0" max="230" value={draft.heartRate} onChange={(event) => setDraft({ ...draft, heartRate: event.target.value })} placeholder="Optioneel" /></label><label className="field"><span>Hoe voelde het?</span><select value={draft.effort} onChange={(event) => setDraft({ ...draft, effort: event.target.value })}><option value="easier">Makkelijker dan verwacht</option><option value="as_expected">Zoals verwacht</option><option value="harder">Zwaarder dan verwacht</option><option value="not_good">Niet goed gegaan</option></select></label><label className="field full"><span>Opmerking</span><textarea rows={2} value={draft.note} onChange={(event) => setDraft({ ...draft, note: event.target.value })} placeholder="Alleen als je iets wilt toevoegen" /></label>
+      {modal === 'activity' && <Modal title="Training toevoegen" subtitle="Vul alleen de gegevens in die je bij de hand hebt." onClose={() => setModal(null)}><form className="form-grid" onSubmit={saveManualActivity}><label className="field full"><span>Naam activiteit</span><input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} placeholder="Bijvoorbeeld rustige duurloop" /></label><label className="field"><span>Datum</span><input type="date" required value={draft.date} onChange={(event) => setDraft({ ...draft, date: event.target.value })} /></label><label className="field"><span>Duur in minuten *</span><input type="number" min="1" required value={draft.duration} onChange={(event) => setDraft({ ...draft, duration: event.target.value })} placeholder="52" /></label><label className="field"><span>Afstand in km</span><input type="number" min="0" step="0.01" value={draft.distance} onChange={(event) => setDraft({ ...draft, distance: event.target.value })} placeholder="9,8" /></label><label className="field"><span>Gem. hartslag</span><input type="number" min="0" max="230" value={draft.heartRate} onChange={(event) => setDraft({ ...draft, heartRate: event.target.value })} placeholder="Optioneel" /></label><label className="field"><span>Hoe voelde het? <small>optioneel</small></span><select value={draft.effort} onChange={(event) => setDraft({ ...draft, effort: event.target.value })}><option value="">Overslaan</option><option value="easier">Makkelijker dan verwacht</option><option value="as_expected">Zoals verwacht</option><option value="harder">Zwaarder dan verwacht</option><option value="not_good">Niet goed gegaan</option></select></label><label className="field full"><span>Opmerking</span><textarea rows={2} value={draft.note} onChange={(event) => setDraft({ ...draft, note: event.target.value })} placeholder="Alleen als je iets wilt toevoegen" /></label>
+          {plan?.weeks.flatMap((week) => week.workouts).some((workout) => workout.status === 'planned' || workout.status === 'adjusted') && <label className="field full"><span>Koppel aan geplande training <small>optioneel</small></span><select value={draft.plannedWorkoutId} onChange={(event) => setDraft({ ...draft, plannedWorkoutId: event.target.value })}><option value="">Geen koppeling</option>{plan.weeks.flatMap((week) => week.workouts).filter((workout) => workout.status === 'planned' || workout.status === 'adjusted').map((workout) => <option key={workout.id} value={workout.id}>{'Week ' + workout.weekNumber + ' · ' + dateLabel(workout.date) + ' · ' + workout.title}</option>)}</select></label>}
           <div className="manual-laps full"><div className="manual-laps-heading"><div><strong>Blokken of laps</strong><span>Optioneel. Alleen ingevulde gegevens worden bewaard.</span></div><button type="button" className="button button-soft button-small" onClick={() => setLapDrafts([...lapDrafts, { id: String(Date.now()), label: 'Blok ' + (lapDrafts.length + 1), durationMinutes: undefined, pace: undefined, averageHeartRate: undefined }])}><Icon name="plus" size={15} /> Blok toevoegen</button></div>{lapDrafts.map((lap, index) => <div className="lap-input-row" key={lap.id}><strong>{lap.label}</strong><input aria-label={'Duur blok ' + (index + 1)} type="number" min="1" placeholder="min" onChange={(event) => setLapDrafts((items) => items.map((item) => item.id === lap.id ? { ...item, durationMinutes: Number(event.target.value) || undefined } : item))} /><input aria-label={'Tempo blok ' + (index + 1)} placeholder="tempo /km" onChange={(event) => setLapDrafts((items) => items.map((item) => item.id === lap.id ? { ...item, pace: event.target.value } : item))} /><input aria-label={'Hartslag blok ' + (index + 1)} type="number" placeholder="HF" onChange={(event) => setLapDrafts((items) => items.map((item) => item.id === lap.id ? { ...item, averageHeartRate: Number(event.target.value) || undefined } : item))} /><button type="button" aria-label="Blok verwijderen" className="icon-quiet" onClick={() => setLapDrafts(lapDrafts.filter((item) => item.id !== lap.id))}><Icon name="close" size={16} /></button></div>)}</div>
           <div className="modal-actions full"><button type="button" className="button button-outline" onClick={() => setModal(null)}>Annuleren</button><button className="button button-primary">Opslaan</button></div></form></Modal>}
+      {modal === 'feedback' && feedbackWorkout && <Modal title="Training afgerond?" subtitle="Je training wordt als uitgevoerd opgeslagen. Feedback is optioneel." onClose={() => setModal(null)}><form className="form-grid" onSubmit={saveWorkoutFeedback}><div className="invite-note full"><Icon name="check" size={18} /><span>{feedbackWorkout.title}</span></div><label className="field full"><span>Hoe ging de training? <small>optioneel</small></span><select value={feedbackDraft.effort} onChange={(event) => setFeedbackDraft({ ...feedbackDraft, effort: event.target.value as QuickFeedbackDraft['effort'] })}><option value="">Geen feedback</option><option value="easier">Veel makkelijker dan verwacht</option><option value="as_expected">Zoals verwacht</option><option value="harder">Zwaarder dan verwacht</option><option value="not_good">Niet goed gegaan</option></select></label><label className="field full"><span>Korte opmerking <small>optioneel</small></span><textarea rows={2} value={feedbackDraft.note} onChange={(event) => setFeedbackDraft({ ...feedbackDraft, note: event.target.value })} placeholder="Alleen als je iets wilt toevoegen" /></label><div className="modal-actions full"><button type="button" className="button button-outline" onClick={() => setModal(null)}>Annuleren</button><button className="button button-primary">Training afronden</button></div></form></Modal>}
       {modal === 'invite' && <Modal title="Atleet uitnodigen" subtitle="De atleet krijgt een e-mail om een eigen account te maken." onClose={() => setModal(null)}><form className="form-grid" onSubmit={inviteAthlete}><label className="field full"><span>Naam</span><input name="name" placeholder="Naam van de atleet" /></label><label className="field full"><span>E-mailadres *</span><input name="email" type="email" required placeholder="naam@voorbeeld.nl" /></label><div className="invite-note full"><Icon name="shield" size={18} /><span>Iedere atleet ziet alleen het eigen profiel en de eigen trainingsgegevens.</span></div><div className="modal-actions full"><button type="button" className="button button-outline" onClick={() => setModal(null)}>Annuleren</button><button className="button button-primary">Uitnodiging versturen</button></div></form></Modal>}
       {modal === 'plan' && selectedAthlete && <Modal title="Marathonplan instellen" subtitle={'Maak een persoonlijk schema voor ' + selectedAthlete.name + '.'} onClose={() => setModal(null)}><form className="form-grid" onSubmit={saveCoachPlan}>
         <label className="field"><span>Marathondatum</span><input type="date" required value={coachPlanDraft.marathonDate} onChange={(event) => setCoachPlanDraft({ ...coachPlanDraft, marathonDate: event.target.value })} /></label>
