@@ -27,6 +27,8 @@ export type RunActivity = {
   laps?: ActivityLap[]
 }
 
+export type CoachNote = { id: string; note: string; createdAt: string }
+
 export type AthleteSummary = {
   id: string
   name: string
@@ -44,6 +46,8 @@ export type AthleteSummary = {
   reason?: string
   activities?: RunActivity[]
   wellness?: WellnessEntry[]
+  coachNotes?: CoachNote[]
+  planWeeks?: PlanWeek[]
 }
 
 export type CoachSuggestion = {
