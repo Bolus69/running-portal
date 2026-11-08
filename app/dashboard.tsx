@@ -82,7 +82,7 @@ function stravaWebhookIssueMessage(issue?: string, detail?: string): string {
     callback_url_too_long: 'Het Strava-webhookadres is te lang. Er is een korter callbackadres nodig.',
     callback_probe_failed: 'De app kan het webhookadres niet zelf bereiken.',
     callback_response_invalid: 'Het webhookadres geeft niet de verwachte Strava-controle terug.',
-    callback_too_slow: 'Het webhookadres antwoordt te langzaam voor Strava.'
+    callback_too_slow: 'Het webhookadres antwoordt te langzaam voor Strava.',
     registration_rejected: 'Strava heeft de automatische koppeling geweigerd.',
     registration_unconfirmed: 'Strava heeft de automatische koppeling niet bevestigd.',
     network_error: 'Strava was tijdelijk niet bereikbaar.',
