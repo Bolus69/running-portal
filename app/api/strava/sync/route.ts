@@ -1,7 +1,7 @@
 import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { isSameOriginRequest, jsonError } from '@/lib/http'
-import { ensureStravaWebhookSubscription, syncStravaActivities } from '@/lib/strava'
+import { ensureStravaWebhookSubscription, StravaWebhookSetupError, syncStravaActivities } from '@/lib/strava'
 
 export async function POST(request: Request) {
   if (!isSameOriginRequest(request)) return jsonError('Ongeldig verzoek.', 403)
@@ -12,13 +12,16 @@ export async function POST(request: Request) {
     const admin = createAdminSupabaseClient()
     const count = await syncStravaActivities(admin, user.id)
     let automaticSyncReady = false
+    let automaticSyncIssue: string | undefined
     try {
       await ensureStravaWebhookSubscription(new URL(request.url).origin)
       automaticSyncReady = true
-    } catch {
+    } catch (error) {
+      automaticSyncIssue = error instanceof StravaWebhookSetupError ? error.code : 'setup_failed'
+      console.warn('[strava-webhook] setup issue:', automaticSyncIssue)
       // Manual imports remain available when webhook delivery is not configured.
     }
-    return Response.json({ ok: true, imported: count, automaticSyncReady }, { headers: { 'Cache-Control': 'no-store' } })
+    return Response.json({ ok: true, imported: count, automaticSyncReady, automaticSyncIssue }, { headers: { 'Cache-Control': 'no-store' } })
   } catch {
     return jsonError('Strava kon nu niet worden gesynchroniseerd. Je bestaande trainingsgeschiedenis blijft beschikbaar.', 502)
   }
