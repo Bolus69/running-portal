@@ -82,6 +82,7 @@ export type DashboardData = {
     weeks: PlanWeek[]
     trainingDays: number[]
     includeOptionalFourth: boolean
+    optionalTrainingDay: number
   } | null
   activities: RunActivity[]
   wellness: WellnessEntry[]
@@ -96,6 +97,7 @@ export type ApiPlanInput = {
   goalTime: string
   trainingDays: number[]
   includeOptionalFourth: boolean
+  optionalTrainingDay?: number
   recentRaceDistanceKm?: number
   recentRaceTimeSeconds?: number
 }

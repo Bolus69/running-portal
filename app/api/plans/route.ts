@@ -22,8 +22,12 @@ export async function POST(request: Request) {
   const goalSeconds = parseDurationToSeconds(typeof body.goalTime === 'string' ? body.goalTime : '')
   const trainingDays = Array.isArray(body.trainingDays) ? body.trainingDays.map(Number) : []
   const includeOptionalFourth = body.includeOptionalFourth === true
+  const optionalTrainingDay = Number(body.optionalTrainingDay ?? 6)
   if (!isPlanLength(length) || !/^\d{4}-\d{2}-\d{2}$/.test(marathonDate) || !goalSeconds || trainingDays.length !== 3 || new Set(trainingDays).size !== 3 || trainingDays.some((day) => !Number.isInteger(day) || day < 0 || day > 6)) {
     return jsonError('Vul een geldige marathondatum, streeftijd, planlengte en drie verschillende trainingsdagen in.', 400)
+  }
+  if (includeOptionalFourth && (!Number.isInteger(optionalTrainingDay) || optionalTrainingDay < 0 || optionalTrainingDay > 6 || trainingDays.includes(optionalTrainingDay))) {
+    return jsonError('Kies voor de optionele training een dag die niet al bij de vaste dagen staat.', 400)
   }
 
   let coachId: string | null = null
@@ -41,7 +45,7 @@ export async function POST(request: Request) {
     : {}
   let weeks
   try {
-    weeks = generatePlan({ marathonDate, length, trainingDays, includeOptionalFourth, goalTimeSeconds: goalSeconds })
+    weeks = generatePlan({ marathonDate, length, trainingDays, includeOptionalFourth, optionalTrainingDay, goalTimeSeconds: goalSeconds })
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : 'Het plan kan niet worden opgebouwd.', 400)
   }

@@ -1,9 +1,11 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { LogoMark } from '@/components/logo'
 import { BRAND } from '@/lib/brand'
-import { calculateTrainingPaces, currentWeekNumber, formatPace, generatePlan, parseDurationToSeconds, phaseLabel } from '@/lib/training-plan'
+import { calculateTrainingPaces, currentWeekNumber, formatPace, generatePlan, getPlanStartDate, parseDurationToSeconds, phaseLabel } from '@/lib/training-plan'
+import { todayDateISO } from '@/lib/dates'
 import type { PlanWeek } from '@/lib/training-plan'
 import type { ActivityLap, AppRole, AthleteSummary, CoachNote, CoachSuggestion, DashboardData, RunActivity, WellnessEntry } from '@/lib/types'
 
@@ -11,7 +13,43 @@ type View = 'week' | 'plan' | 'history' | 'wellness' | 'profile' | 'coach' | 'at
 type ManualDraft = { name: string; date: string; duration: string; distance: string; heartRate: string; effort: string; note: string; plannedWorkoutId: string }
 type QuickFeedbackDraft = { effort: NonNullable<RunActivity['effort']> | ''; note: string }
 type WellnessDraft = { sleepHours: string; restingHeartRate: string; recoveryScore: string; note: string; visibleToCoach: boolean }
-type ProfileDraft = { marathonDate: string; goalTime: string; planLength: 12 | 16 | 20; days: number[]; optional: boolean; raceTime: string; raceDistance: string }
+type ProfileDraft = { marathonDate: string; goalTime: string; planLength: 12 | 16 | 20; days: number[]; optional: boolean; optionalTrainingDay: number; raceTime: string; raceDistance: string }
+
+const TRAINING_DAYS = [{ value: 1, label: 'Ma' }, { value: 2, label: 'Di' }, { value: 3, label: 'Wo' }, { value: 4, label: 'Do' }, { value: 5, label: 'Vr' }, { value: 6, label: 'Za' }, { value: 0, label: 'Zo' }]
+
+function toggleProfileDay(setDraft: React.Dispatch<React.SetStateAction<ProfileDraft>>, value: number) {
+  setDraft((current) => {
+    const days = current.days.includes(value) ? current.days.filter((day) => day !== value) : [...current.days, value]
+    const optionalTrainingDay = current.optional && days.includes(current.optionalTrainingDay)
+      ? (TRAINING_DAYS.find((day) => !days.includes(day.value))?.value ?? current.optionalTrainingDay)
+      : current.optionalTrainingDay
+    return { ...current, days, optionalTrainingDay }
+  })
+}
+
+function PlanTimingNote({ draft }: { draft: ProfileDraft }) {
+  if (!draft.marathonDate) return <p className="plan-timing-note">Kies een marathondatum om de start van week 1 te zien.</p>
+  if (draft.days.length !== 3) return <p className="plan-timing-note">Kies precies drie vaste dagen om de startdatum te berekenen.</p>
+  let message: string
+  let isPast = false
+  try {
+    const start = getPlanStartDate({
+      marathonDate: draft.marathonDate,
+      length: draft.planLength,
+      trainingDays: draft.days,
+      includeOptionalFourth: draft.optional,
+      optionalTrainingDay: draft.optionalTrainingDay,
+    })
+    isPast = start < todayDateISO()
+    message = isPast
+      ? 'Dit schema zou starten op ' + dateLabel(start, { day: 'numeric', month: 'long', year: 'numeric' }) + ', in het verleden. Kies een korter schema of een latere marathondatum.'
+      : 'Start van week 1: ' + dateLabel(start, { day: 'numeric', month: 'long', year: 'numeric' }) + '.'
+  } catch (error) {
+    isPast = true
+    message = error instanceof Error ? error.message : 'Controleer de marathondatum en trainingsdagen.'
+  }
+  return <p className={'plan-timing-note' + (isPast ? ' warning' : '')}>{message}</p>
+}
 
 function Icon({ name, size = 19 }: { name: string; size?: number }) {
   const common = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true as const }
@@ -37,18 +75,6 @@ function Icon({ name, size = 19 }: { name: string; size?: number }) {
     more: <><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></>,
   }
   return <svg {...common}>{paths[name] ?? paths.run}</svg>
-}
-
-function LogoMark({ small = false }: { small?: boolean }) {
-  return (
-    <svg className={small ? 'logo-mark logo-mark-small' : 'logo-mark'} viewBox="0 0 48 48" fill="none" role="img" aria-label="Marathon Coach by Maarten logo">
-      <rect width="48" height="48" rx="15" fill="#14243A" />
-      <path d="M6.5 32.6c5.6-3.2 11.2-4 17.2-2.6M7 37c8.2-2.4 15.8-2.4 23 .1" stroke="#8FB5D7" strokeWidth="1.6" strokeLinecap="round" opacity=".7" />
-      <circle cx="29.1" cy="9.8" r="3.3" fill="#D5F36B" />
-      <path d="m26.1 15.1-4.4 8 7.2 3.5 5-7.5M22 19.5l-5.5-3.1-4.5 2.5M29 26.4l-8.5 5.5-3.1 6M29.2 26.6l6.5 5.7 4.2.7" stroke="#D5F36B" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M7.5 41c9.6 3.5 22.9 3.7 33-.4" stroke="#F7FAFC" strokeWidth="1.5" strokeLinecap="round" opacity=".76" />
-    </svg>
-  )
 }
 
 function dateLabel(value: string, options: Intl.DateTimeFormatOptions = { weekday: 'short', day: 'numeric', month: 'short' }) {
@@ -123,15 +149,17 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
   const [feedbackWorkout, setFeedbackWorkout] = useState<PlanWeek['workouts'][number] | null>(null)
   const [feedbackDraft, setFeedbackDraft] = useState<QuickFeedbackDraft>({ effort: '', note: '' })
   const [toast, setToast] = useState('')
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false)
+  const accountMenuRef = useRef<HTMLDivElement>(null)
   const [evaluatingSuggestions, setEvaluatingSuggestions] = useState(false)
   const [syncingStrava, setSyncingStrava] = useState(false)
   const [expandedWorkout, setExpandedWorkout] = useState<string | null>(null)
   const [selectedAthlete, setSelectedAthlete] = useState<AthleteSummary | null>(null)
-  const [draft, setDraft] = useState<ManualDraft>({ name: '', date: new Date().toISOString().slice(0, 10), duration: '', distance: '', heartRate: '', effort: '', note: '', plannedWorkoutId: '' })
+  const [draft, setDraft] = useState<ManualDraft>({ name: '', date: todayDateISO(), duration: '', distance: '', heartRate: '', effort: '', note: '', plannedWorkoutId: '' })
   const [lapDrafts, setLapDrafts] = useState<ActivityLap[]>([])
   const [wellnessDraft, setWellnessDraft] = useState<WellnessDraft>({ sleepHours: '', restingHeartRate: '', recoveryScore: '', note: '', visibleToCoach: true })
-  const [profileDraft, setProfileDraft] = useState<ProfileDraft>({ marathonDate: initialData.plan?.marathonDate ?? '', goalTime: initialData.plan?.goalTime ?? '', planLength: initialData.plan?.length ?? 16, days: initialData.plan?.trainingDays ?? [2, 4, 0], optional: initialData.plan?.includeOptionalFourth ?? false, raceTime: '50:00', raceDistance: '10' })
-  const [coachPlanDraft, setCoachPlanDraft] = useState<ProfileDraft>({ marathonDate: '', goalTime: '04:00:00', planLength: 16, days: [2, 4, 0], optional: false, raceTime: '00:50:00', raceDistance: '10' })
+  const [profileDraft, setProfileDraft] = useState<ProfileDraft>({ marathonDate: initialData.plan?.marathonDate ?? '', goalTime: initialData.plan?.goalTime ?? '', planLength: initialData.plan?.length ?? 16, days: initialData.plan?.trainingDays ?? [2, 4, 0], optional: initialData.plan?.includeOptionalFourth ?? false, optionalTrainingDay: initialData.plan?.optionalTrainingDay ?? 6, raceTime: '50:00', raceDistance: '10' })
+  const [coachPlanDraft, setCoachPlanDraft] = useState<ProfileDraft>({ marathonDate: '', goalTime: '04:00:00', planLength: 16, days: [2, 4, 0], optional: false, optionalTrainingDay: 6, raceTime: '00:50:00', raceDistance: '10' })
 
   useEffect(() => {
     if (demoMode) return
@@ -175,6 +203,22 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
     const timer = window.setTimeout(() => setToast(''), 3200)
     return () => window.clearTimeout(timer)
   }, [toast])
+
+  useEffect(() => {
+    if (!accountMenuOpen) return
+    const closeOutside = (event: PointerEvent) => {
+      if (event.target instanceof Node && !accountMenuRef.current?.contains(event.target)) setAccountMenuOpen(false)
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setAccountMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', closeOutside)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('pointerdown', closeOutside)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [accountMenuOpen])
 
   useEffect(() => {
     const url = new URL(window.location.href)
@@ -280,7 +324,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
       }))
       setModal(null)
       setLapDrafts([])
-      setDraft({ name: '', date: new Date().toISOString().slice(0, 10), duration: '', distance: '', heartRate: '', effort: '', note: '', plannedWorkoutId: '' })
+      setDraft({ name: '', date: todayDateISO(), duration: '', distance: '', heartRate: '', effort: '', note: '', plannedWorkoutId: '' })
       showToast(result.warning ?? 'Training toegevoegd aan je geschiedenis.')
       return
     }
@@ -291,7 +335,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
     }))
     setModal(null)
     setLapDrafts([])
-    setDraft({ name: '', date: new Date().toISOString().slice(0, 10), duration: '', distance: '', heartRate: '', effort: '', note: '', plannedWorkoutId: '' })
+    setDraft({ name: '', date: todayDateISO(), duration: '', distance: '', heartRate: '', effort: '', note: '', plannedWorkoutId: '' })
     showToast('Training toegevoegd aan je geschiedenis.')
   }
 
@@ -299,7 +343,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
     event.preventDefault()
     const entry: WellnessEntry = {
       id: 'wellness-' + Date.now(),
-      date: new Date().toISOString().slice(0, 10),
+      date: todayDateISO(),
       sleepHours: wellnessDraft.sleepHours ? Number(wellnessDraft.sleepHours) : undefined,
       restingHeartRate: wellnessDraft.restingHeartRate ? Number(wellnessDraft.restingHeartRate) : undefined,
       recoveryScore: wellnessDraft.recoveryScore ? Number(wellnessDraft.recoveryScore) : undefined,
@@ -307,8 +351,13 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
       visibleToCoach: wellnessDraft.visibleToCoach,
     }
     if (!demoMode) {
-      const response = await fetch('/api/wellness', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(entry) })
-      if (!response.ok) return showToast('Opslaan lukte niet. Probeer het opnieuw.')
+      try {
+        const response = await fetch('/api/wellness', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(entry) })
+        const result = await response.json().catch(() => ({})) as { error?: string }
+        if (!response.ok) return showToast(result.error ?? 'Opslaan lukte niet. Probeer het opnieuw.')
+      } catch {
+        return showToast('Geen verbinding. Je herstelgegevens zijn niet opgeslagen.')
+      }
     }
     setData((current) => ({ ...current, wellness: [entry, ...current.wellness.filter((item) => item.date !== entry.date)] }))
     setWellnessDraft({ sleepHours: '', restingHeartRate: '', recoveryScore: '', note: '', visibleToCoach: true })
@@ -319,14 +368,20 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
     event.preventDefault()
     const goalSeconds = parseDurationToSeconds(profileDraft.goalTime)
     if (!goalSeconds) return showToast('Gebruik voor je streeftijd uu:mm:ss, bijvoorbeeld 04:00:00.')
-    if (profileDraft.days.length !== 3) return showToast('Kies precies drie vaste trainingsdagen.')
-    const weeks = generatePlan({
-      marathonDate: profileDraft.marathonDate,
-      length: profileDraft.planLength,
-      trainingDays: profileDraft.days,
-      includeOptionalFourth: profileDraft.optional,
-      goalTimeSeconds: goalSeconds,
-    })
+    if (profileDraft.days.length !== 3) return showToast('Je hebt ' + profileDraft.days.length + ' vaste dagen gekozen. Kies precies drie.')
+    let weeks: PlanWeek[]
+    try {
+      weeks = generatePlan({
+        marathonDate: profileDraft.marathonDate,
+        length: profileDraft.planLength,
+        trainingDays: profileDraft.days,
+        includeOptionalFourth: profileDraft.optional,
+        optionalTrainingDay: profileDraft.optionalTrainingDay,
+        goalTimeSeconds: goalSeconds,
+      })
+    } catch (error) {
+      return showToast(error instanceof Error ? error.message : 'Het plan kan niet worden opgebouwd.')
+    }
     const newPlan = {
       length: profileDraft.planLength,
       marathonDate: profileDraft.marathonDate,
@@ -335,10 +390,12 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
       weeks,
       trainingDays: [...profileDraft.days],
       includeOptionalFourth: profileDraft.optional,
+      optionalTrainingDay: profileDraft.optionalTrainingDay,
     }
     if (!demoMode) {
-      const response = await fetch('/api/plans', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ marathonDate: newPlan.marathonDate, planLength: newPlan.length, goalTime: newPlan.goalTime, trainingDays: newPlan.trainingDays, includeOptionalFourth: newPlan.includeOptionalFourth, recentRaceDistanceKm: Number(profileDraft.raceDistance), recentRaceTimeSeconds: parseDurationToSeconds(profileDraft.raceTime) }) })
-      if (!response.ok) return showToast('Het plan kon niet worden bijgewerkt. Controleer je accountinstellingen.')
+      const response = await fetch('/api/plans', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ marathonDate: newPlan.marathonDate, planLength: newPlan.length, goalTime: newPlan.goalTime, trainingDays: newPlan.trainingDays, includeOptionalFourth: newPlan.includeOptionalFourth, optionalTrainingDay: newPlan.optionalTrainingDay, recentRaceDistanceKm: Number(profileDraft.raceDistance), recentRaceTimeSeconds: parseDurationToSeconds(profileDraft.raceTime) }) })
+      const result = await response.json().catch(() => ({})) as { error?: string }
+      if (!response.ok) return showToast(result.error ?? 'Het plan kon niet worden bijgewerkt. Controleer je accountinstellingen.')
     }
     setData((current) => ({ ...current, plan: newPlan }))
     showToast('Je trainingsplan is bijgewerkt.')
@@ -349,13 +406,15 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
     if (!selectedAthlete) return
     const goalSeconds = parseDurationToSeconds(coachPlanDraft.goalTime)
     if (!goalSeconds) return showToast('Gebruik voor de streeftijd uu:mm:ss, bijvoorbeeld 04:00:00.')
-    if (coachPlanDraft.days.length !== 3) return showToast('Kies precies drie vaste trainingsdagen.')
+    if (coachPlanDraft.days.length !== 3) return showToast('Je hebt ' + coachPlanDraft.days.length + ' vaste dagen gekozen. Kies precies drie.')
+    let generatedWeeks: PlanWeek[]
     try {
-      generatePlan({
+      generatedWeeks = generatePlan({
         marathonDate: coachPlanDraft.marathonDate,
         length: coachPlanDraft.planLength,
         trainingDays: coachPlanDraft.days,
         includeOptionalFourth: coachPlanDraft.optional,
+        optionalTrainingDay: coachPlanDraft.optionalTrainingDay,
         goalTimeSeconds: goalSeconds,
       })
     } catch (error) {
@@ -373,11 +432,13 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
           goalTime: coachPlanDraft.goalTime,
           trainingDays: coachPlanDraft.days,
           includeOptionalFourth: coachPlanDraft.optional,
+          optionalTrainingDay: coachPlanDraft.optionalTrainingDay,
           recentRaceDistanceKm: Number(coachPlanDraft.raceDistance),
           recentRaceTimeSeconds: parseDurationToSeconds(coachPlanDraft.raceTime),
         }),
       })
-      if (!response.ok) return showToast('Het plan kon niet worden opgeslagen. Controleer je coachrechten en de invoer.')
+      const result = await response.json().catch(() => ({})) as { error?: string }
+      if (!response.ok) return showToast(result.error ?? 'Het plan kon niet worden opgeslagen. Controleer je coachrechten en de invoer.')
     }
 
     const updatedAthlete: AthleteSummary = {
@@ -390,6 +451,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
       plannedThisWeek: 3,
       completedThisWeek: 0,
       lastLongRun: undefined,
+      planWeeks: generatedWeeks,
     }
     setSelectedAthlete(updatedAthlete)
     setData((current) => ({
@@ -507,13 +569,14 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
       planLength: athlete.planLength || 16,
       days: [2, 4, 0],
       optional: false,
+      optionalTrainingDay: 6,
       raceTime: '00:50:00',
       raceDistance: '10',
     })
     setModal('plan')
   }
 
-  const todayWellness = data.wellness.find((item) => item.date === new Date().toISOString().slice(0, 10))
+  const todayWellness = data.wellness.find((item) => item.date === todayDateISO())
   const navItems = role === 'athlete'
     ? [{ id: 'week' as const, icon: 'week', label: 'Deze week' }, { id: 'plan' as const, icon: 'plan', label: 'Mijn schema' }, { id: 'history' as const, icon: 'history', label: 'Geschiedenis' }, { id: 'wellness' as const, icon: 'heart', label: 'Herstel & welzijn' }, { id: 'profile' as const, icon: 'user', label: 'Mijn profiel' }]
     : [{ id: 'coach' as const, icon: 'coach', label: 'Overzicht' }, { id: 'athletes' as const, icon: 'people', label: 'Atleten' }, { id: 'history' as const, icon: 'history', label: 'Mijn trainingen' }, { id: 'suggestions' as const, icon: 'spark', label: 'Voorstellen' }, { id: 'profile' as const, icon: 'user', label: 'Mijn profiel' }]
@@ -530,7 +593,19 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
           {navItems.map((item) => <NavItem key={item.id} icon={item.icon} label={item.label} active={view === item.id || (view === 'athlete-detail' && item.id === 'athletes')} onClick={() => go(item.id)} />)}
         </nav>
         <div className="sidebar-bottom">
-          <div className="coach-card"><div className="coach-avatar">M</div><div><strong>Maarten</strong><span>{BRAND.subtitle}</span></div><button aria-label="Meer opties" className="icon-quiet"><Icon name="more" /></button></div>
+          <div className="coach-card" ref={accountMenuRef}>
+            <div className="coach-avatar">{data.profile.name.charAt(0).toUpperCase()}</div>
+            <div><strong>{data.profile.name}</strong><span>{role === 'coach' ? BRAND.subtitle : 'Atleet'}</span></div>
+            <div className="account-menu-wrap">
+              <button type="button" aria-label="Accountopties" aria-haspopup="menu" aria-expanded={accountMenuOpen} className="icon-quiet" onClick={() => setAccountMenuOpen((open) => !open)}><Icon name="more" /></button>
+              {accountMenuOpen && <div className="account-menu" role="menu" aria-label="Accountopties">
+                <button type="button" role="menuitem" onClick={() => { setAccountMenuOpen(false); go('profile') }}>Mijn profiel</button>
+                {demoMode
+                  ? <button type="button" role="menuitem" onClick={() => { window.localStorage.removeItem('marathon-coach-preview-v1'); window.location.reload() }}>Voorbeeld resetten</button>
+                  : <form action="/auth/signout" method="post"><button type="submit" role="menuitem">Uitloggen</button></form>}
+              </div>}
+            </div>
+          </div>
           <div className="side-brand-note"><LogoMark small /><span>Train met aandacht.<br />Loop met vertrouwen.</span></div>
         </div>
       </aside>
@@ -589,11 +664,11 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
       {modal === 'feedback' && feedbackWorkout && <Modal title="Training afgerond?" subtitle="Je training wordt als uitgevoerd opgeslagen. Feedback is optioneel." onClose={() => setModal(null)}><form className="form-grid" onSubmit={saveWorkoutFeedback}><div className="invite-note full"><Icon name="check" size={18} /><span>{feedbackWorkout.title}</span></div><label className="field full"><span>Hoe ging de training? <small>optioneel</small></span><select value={feedbackDraft.effort} onChange={(event) => setFeedbackDraft({ ...feedbackDraft, effort: event.target.value as QuickFeedbackDraft['effort'] })}><option value="">Geen feedback</option><option value="easier">Veel makkelijker dan verwacht</option><option value="as_expected">Zoals verwacht</option><option value="harder">Zwaarder dan verwacht</option><option value="not_good">Niet goed gegaan</option></select></label><label className="field full"><span>Korte opmerking <small>optioneel</small></span><textarea rows={2} value={feedbackDraft.note} onChange={(event) => setFeedbackDraft({ ...feedbackDraft, note: event.target.value })} placeholder="Alleen als je iets wilt toevoegen" /></label><div className="modal-actions full"><button type="button" className="button button-outline" onClick={() => setModal(null)}>Annuleren</button><button className="button button-primary">Training afronden</button></div></form></Modal>}
       {modal === 'invite' && <Modal title="Atleet uitnodigen" subtitle="De atleet krijgt een e-mail om een eigen account te maken." onClose={() => setModal(null)}><form className="form-grid" onSubmit={inviteAthlete}><label className="field full"><span>Naam</span><input name="name" placeholder="Naam van de atleet" /></label><label className="field full"><span>E-mailadres *</span><input name="email" type="email" required placeholder="naam@voorbeeld.nl" /></label><div className="invite-note full"><Icon name="shield" size={18} /><span>Iedere atleet ziet alleen het eigen profiel en de eigen trainingsgegevens.</span></div><div className="modal-actions full"><button type="button" className="button button-outline" onClick={() => setModal(null)}>Annuleren</button><button className="button button-primary">Uitnodiging versturen</button></div></form></Modal>}
       {modal === 'plan' && selectedAthlete && <Modal title="Marathonplan instellen" subtitle={'Maak een persoonlijk schema voor ' + selectedAthlete.name + '.'} onClose={() => setModal(null)}><form className="form-grid" onSubmit={saveCoachPlan}>
-        <label className="field"><span>Marathondatum</span><input type="date" required value={coachPlanDraft.marathonDate} onChange={(event) => setCoachPlanDraft({ ...coachPlanDraft, marathonDate: event.target.value })} /></label>
+        <label className="field"><span>Marathondatum</span><input type="date" min={todayDateISO()} required value={coachPlanDraft.marathonDate} onChange={(event) => setCoachPlanDraft({ ...coachPlanDraft, marathonDate: event.target.value })} /></label>
         <label className="field"><span>Streeftijd <small>uu:mm:ss</small></span><input required pattern="\d{2}:\d{2}:\d{2}" value={coachPlanDraft.goalTime} onChange={(event) => setCoachPlanDraft({ ...coachPlanDraft, goalTime: event.target.value })} placeholder="04:00:00" /></label>
-        <div className="field full"><span>Planlengte</span><div className="plan-length-options">{([12, 16, 20] as const).map((length) => <button type="button" key={length} className={coachPlanDraft.planLength === length ? 'selected' : ''} onClick={() => setCoachPlanDraft({ ...coachPlanDraft, planLength: length })}><strong>{length}</strong><span>weken</span></button>)}</div></div>
-        <div className="field full"><span>Vaste trainingsdagen <small>kies er precies drie</small></span><div className="day-options">{[{ value: 1, label: 'Ma' }, { value: 2, label: 'Di' }, { value: 3, label: 'Wo' }, { value: 4, label: 'Do' }, { value: 5, label: 'Vr' }, { value: 6, label: 'Za' }, { value: 0, label: 'Zo' }].map((day) => <button type="button" key={day.value} className={coachPlanDraft.days.includes(day.value) ? 'selected' : ''} onClick={() => setCoachPlanDraft((current) => { if (current.days.includes(day.value)) return { ...current, days: current.days.filter((item) => item !== day.value) }; if (current.days.length === 3) return current; return { ...current, days: [...current.days, day.value] } })}>{day.label}</button>)}</div></div>
-        <label className="optional-setting full"><input type="checkbox" checked={coachPlanDraft.optional} onChange={(event) => setCoachPlanDraft({ ...coachPlanDraft, optional: event.target.checked })} /><span><strong>Optionele vierde training</strong><small>Alleen rustig herstel of korte techniek.</small></span></label>
+        <PlanTimingNote draft={coachPlanDraft} />
+        <div className="field full"><span>Planlengte</span><div className="plan-length-options">{([12, 16, 20] as const).map((length) => <button type="button" key={length} aria-pressed={coachPlanDraft.planLength === length} className={coachPlanDraft.planLength === length ? 'selected' : ''} onClick={() => setCoachPlanDraft({ ...coachPlanDraft, planLength: length })}><strong>{length}</strong><span>weken</span></button>)}</div></div>
+        <TrainingDaysControl draft={coachPlanDraft} setDraft={setCoachPlanDraft} />
         <div className="field full"><span>Recente wedstrijdtijd <small>voor tempo-indicaties</small></span><div className="form-row"><input type="number" min="1" step="0.1" aria-label="Wedstrijdafstand in kilometers" value={coachPlanDraft.raceDistance} onChange={(event) => setCoachPlanDraft({ ...coachPlanDraft, raceDistance: event.target.value })} /><input value={coachPlanDraft.raceTime} aria-label="Wedstrijdtijd" onChange={(event) => setCoachPlanDraft({ ...coachPlanDraft, raceTime: event.target.value })} placeholder="00:50:00" /></div></div>
         <div className="invite-note full"><Icon name="shield" size={18} /><span>Een nieuw schema pauzeert het vorige. De atleet ziet daarna het nieuwe actieve schema.</span></div>
         <div className="modal-actions full"><button type="button" className="button button-outline" onClick={() => setModal(null)}>Annuleren</button><button className="button button-primary">Schema opslaan</button></div>
@@ -663,18 +738,156 @@ function HistoryView({ activities, onAdd }: { activities: RunActivity[]; onAdd: 
   return <section className="history-page"><div className="history-toolbar"><div className="filter-chip active">Laatste 30 dagen</div><button className="button button-outline button-small" onClick={onAdd}><Icon name="plus" size={15} /> Handmatig toevoegen</button></div>{items.length ? <div className="history-list">{items.map((activity) => <article className="history-card" key={activity.id}><div className="history-date"><strong>{dateLabel(activity.startedAt, { day: 'numeric' })}</strong><span>{dateLabel(activity.startedAt, { month: 'short' })}</span></div><div className="history-activity-icon"><Icon name="run" size={18} /></div><div className="history-main"><div className="history-title-row"><h3>{activity.name}</h3><span className={'source-pill source-' + activity.source}>{activity.source === 'strava' ? <><Icon name="link" size={13} /> Strava</> : 'Handmatig'}</span></div><div className="history-meta"><span>{activity.distanceKm ? activity.distanceKm.toFixed(1).replace('.', ',') + ' km' : 'Afstand niet ingevuld'}</span><span>{activity.durationMinutes} min</span>{activity.pace && <span>{activity.pace} /km</span>}{activity.averageHeartRate && <span>{activity.averageHeartRate} bpm gem.</span>}</div>{activity.effort && <p className="history-feedback"><span>Gevoel</span>{effortLabel(activity.effort)}</p>}{activity.note && <p className="history-note">{activity.note}</p>}{activity.laps && activity.laps.length > 0 && <details className="lap-details"><summary>{activity.laps.length} laps / blokken met gegevens</summary><div className="lap-table">{activity.laps.map((lap) => <div key={lap.id}><span>{lap.label}</span><span>{lap.durationMinutes ? lap.durationMinutes + ' min' : '—'}</span><span>{lap.pace ? lap.pace + ' /km' : '—'}</span><span>{lap.averageHeartRate ? lap.averageHeartRate + ' bpm' : '—'}</span></div>)}</div></details>}</div><span className={'history-link-status ' + (activity.plannedWorkoutId ? 'linked' : 'unlinked')}>{activity.plannedWorkoutId ? 'Gekoppeld' : 'Losse activiteit'}</span></article>)}</div> : <div className="empty-state"><div className="empty-plan-mark"><Icon name="history" size={24} /></div><h3>Nog geen trainingen</h3><p>Voeg na je training kort de belangrijkste gegevens toe.</p><button className="button button-primary button-small" onClick={onAdd}><Icon name="plus" size={15} /> Training toevoegen</button></div>}</section>
 }
 
+function TrainingDaysControl({ draft, setDraft }: { draft: ProfileDraft; setDraft: React.Dispatch<React.SetStateAction<ProfileDraft>> }) {
+  const availableOptionalDays = TRAINING_DAYS.filter((day) => !draft.days.includes(day.value))
+
+  function toggleOptional(enabled: boolean) {
+    setDraft((current) => {
+      const optionalTrainingDay = enabled && current.days.includes(current.optionalTrainingDay)
+        ? (TRAINING_DAYS.find((day) => !current.days.includes(day.value))?.value ?? 6)
+        : current.optionalTrainingDay
+      return { ...current, optional: enabled, optionalTrainingDay }
+    })
+  }
+
+  return (
+    <>
+      <div className="field full">
+        <span>Vaste trainingsdagen <small>{draft.days.length}/3 gekozen</small></span>
+        <div className="day-options">
+          {TRAINING_DAYS.map((day) => (
+            <button
+              type="button"
+              key={day.value}
+              aria-pressed={draft.days.includes(day.value)}
+              className={draft.days.includes(day.value) ? 'selected' : ''}
+              onClick={() => toggleProfileDay(setDraft, day.value)}
+            >
+              {day.label}
+            </button>
+          ))}
+        </div>
+        <small className="day-selection-hint">Selecteer of deselecteer dagen. Je kunt eerst een nieuwe dag kiezen en daarna een oude uitzetten; opslaan vraagt precies drie dagen.</small>
+      </div>
+      <label className="optional-setting full">
+        <input type="checkbox" checked={draft.optional} onChange={(event) => toggleOptional(event.target.checked)} />
+        <span><strong>Optionele vierde training beschikbaar</strong><small>Rustige herstelduurloop of korte techniektraining.</small></span>
+      </label>
+      {draft.optional && (
+        <div className="field full">
+          <span>Dag van de optionele training <small>kies een dag buiten je vaste dagen</small></span>
+          <div className="day-options">
+            {availableOptionalDays.map((day) => (
+              <button
+                type="button"
+                key={day.value}
+                aria-pressed={draft.optionalTrainingDay === day.value}
+                className={draft.optionalTrainingDay === day.value ? 'selected' : ''}
+                onClick={() => setDraft((current) => ({ ...current, optionalTrainingDay: day.value }))}
+              >
+                {day.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
 function WellnessView({ wellness, todayWellness, draft, setDraft, onSubmit }: { wellness: WellnessEntry[]; todayWellness?: WellnessEntry; draft: WellnessDraft; setDraft: React.Dispatch<React.SetStateAction<WellnessDraft>>; onSubmit: (event: React.FormEvent<HTMLFormElement>) => void }) {
-  return <div className="wellness-layout"><section className="wellness-form-card"><div className="section-heading"><div><p className="eyebrow">VRIJBLIJVEND</p><h2>Hoe is je herstel?</h2></div><span className="wellness-icon-large"><Icon name="heart" size={22} /></span></div><p className="muted">Vul alleen in wat je wilt delen. De velden zijn niet verplicht en er komen geen meldingen als je niets invult.</p><form onSubmit={onSubmit} className="wellness-form"><label className="field"><span>Slaapduur <small>uur</small></span><input type="number" min="0" max="24" step="0.25" value={draft.sleepHours} onChange={(event) => setDraft({ ...draft, sleepHours: event.target.value })} placeholder="Bijv. 7,5" /></label><label className="field"><span>Rusthartslag <small>bpm</small></span><input type="number" min="25" max="220" value={draft.restingHeartRate} onChange={(event) => setDraft({ ...draft, restingHeartRate: event.target.value })} placeholder="Bijv. 54" /></label><div className="field full"><span>Herstelgevoel</span><div className="recovery-select">{[1, 2, 3, 4, 5].map((value) => <button type="button" key={value} className={draft.recoveryScore === String(value) ? 'selected' : ''} onClick={() => setDraft({ ...draft, recoveryScore: draft.recoveryScore === String(value) ? '' : String(value) })}><span>{value}</span><small>{['Slecht', 'Matig', 'Neutraal', 'Goed', 'Heel goed'][value - 1]}</small></button>)}</div></div><label className="field full"><span>Korte opmerking <small>optioneel</small></span><textarea rows={3} value={draft.note} onChange={(event) => setDraft({ ...draft, note: event.target.value })} placeholder="Bijvoorbeeld: drukke werkweek, voelde me fris tijdens het lopen" /></label><label className="privacy-toggle full"><input type="checkbox" checked={draft.visibleToCoach} onChange={(event) => setDraft({ ...draft, visibleToCoach: event.target.checked })} /><span><strong>Deel deze gegevens met mijn coach</strong><small>Je kunt dit per invoer aanpassen.</small></span><Icon name="shield" size={18} /></label><div className="form-actions full"><button className="button button-primary">Opslaan</button><span>Alle velden zijn optioneel.</span></div></form></section><aside className="wellness-side"><div className="privacy-card"><span className="aside-icon light"><Icon name="shield" /></span><h3>Jij bepaalt wat je deelt</h3><p>Herstelgegevens zijn ondersteunende context voor het coachgesprek. Ze zijn geen medische beoordeling of diagnose.</p><div className="privacy-points"><span><Icon name="check" size={15} /> Geen dagelijkse verplichting</span><span><Icon name="check" size={15} /> Geen herinneringen bij lege velden</span><span><Icon name="check" size={15} /> Zelf kiezen of de coach meekijkt</span></div></div><div className="wellness-history"><div className="small-label">LAATSTE INVOER</div>{todayWellness ? <div className="wellness-entry"><strong>{dateLabel(todayWellness.date, { day: 'numeric', month: 'long' })}</strong><span>{todayWellness.sleepHours ? todayWellness.sleepHours + ' uur slaap' : 'Slaap niet ingevuld'}</span>{todayWellness.restingHeartRate ? <span>{todayWellness.restingHeartRate} bpm rusthartslag</span> : null}{todayWellness.recoveryScore ? <div className="wellness-entry-score"><EffortDots value={todayWellness.recoveryScore} /><small>herstelgevoel</small></div> : null}</div> : <p className="muted">Je hebt vandaag nog niets ingevuld.</p>}{wellness.filter((entry) => entry.date !== todayWellness?.date).slice(0, 4).map((entry) => <div className="wellness-entry compact" key={entry.id}><strong>{dateLabel(entry.date, { day: 'numeric', month: 'short' })}</strong><span>{entry.recoveryScore ? 'Herstelgevoel ' + entry.recoveryScore + '/5' : entry.sleepHours ? entry.sleepHours + ' uur slaap' : 'Invoer opgeslagen'}</span></div>)}</div></aside></div>
+  const entryDate = todayDateISO()
+  return (
+    <div className="wellness-layout">
+      <section className="wellness-form-card">
+        <div className="section-heading">
+          <div><p className="eyebrow">VRIJBLIJVEND</p><h2>Hoe is je herstel?</h2></div>
+          <span className="wellness-icon-large"><Icon name="heart" size={22} /></span>
+        </div>
+        <p className="muted">Vul alleen in wat je wilt delen. De velden zijn niet verplicht en er komen geen meldingen als je niets invult.</p>
+        <div className="wellness-form-date"><Icon name="clock" size={16} /><span>Datum van invoer: <strong>{dateLabel(entryDate, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</strong>. Deze datum wordt bij opslaan vastgelegd.</span></div>
+        <form onSubmit={onSubmit} className="wellness-form">
+          <label className="field"><span>Slaapduur <small>uur</small></span><input type="number" min="0" max="24" step="0.25" value={draft.sleepHours} onChange={(event) => setDraft({ ...draft, sleepHours: event.target.value })} placeholder="Bijv. 7,5" /></label>
+          <label className="field"><span>Rusthartslag <small>bpm</small></span><input type="number" min="25" max="220" value={draft.restingHeartRate} onChange={(event) => setDraft({ ...draft, restingHeartRate: event.target.value })} placeholder="Bijv. 54" /></label>
+          <div className="field full"><span>Herstelgevoel</span><div className="recovery-select">{[1, 2, 3, 4, 5].map((value) => <button type="button" key={value} aria-pressed={draft.recoveryScore === String(value)} className={draft.recoveryScore === String(value) ? 'selected' : ''} onClick={() => setDraft({ ...draft, recoveryScore: draft.recoveryScore === String(value) ? '' : String(value) })}><span>{value}</span><small>{['Slecht', 'Matig', 'Neutraal', 'Goed', 'Heel goed'][value - 1]}</small></button>)}</div></div>
+          <label className="field full"><span>Korte opmerking <small>optioneel</small></span><textarea rows={3} value={draft.note} onChange={(event) => setDraft({ ...draft, note: event.target.value })} placeholder="Bijvoorbeeld: drukke werkweek, voelde me fris tijdens het lopen" /></label>
+          <label className="privacy-toggle full"><input type="checkbox" checked={draft.visibleToCoach} onChange={(event) => setDraft({ ...draft, visibleToCoach: event.target.checked })} /><span><strong>Deel deze gegevens met mijn coach</strong><small>Je kunt dit per invoer aanpassen.</small></span><Icon name="shield" size={18} /></label>
+          <div className="form-actions full"><button className="button button-primary">Opslaan</button><span>Alle velden zijn optioneel.</span></div>
+        </form>
+      </section>
+      <aside className="wellness-side">
+        <div className="privacy-card">
+          <span className="aside-icon light"><Icon name="shield" /></span><h3>Jij bepaalt wat je deelt</h3>
+          <p>Herstelgegevens zijn ondersteunende context voor het coachgesprek. Ze zijn geen medische beoordeling of diagnose.</p>
+          <div className="privacy-points"><span><Icon name="check" size={15} /> Geen dagelijkse verplichting</span><span><Icon name="check" size={15} /> Geen herinneringen bij lege velden</span><span><Icon name="check" size={15} /> Zelf kiezen of de coach meekijkt</span></div>
+        </div>
+        <div className="wellness-history">
+          <div className="small-label">LAATSTE INVOER</div>
+          {todayWellness ? <div className="wellness-entry">
+            <strong>{dateLabel(todayWellness.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</strong>
+            <span>{todayWellness.sleepHours ? todayWellness.sleepHours + ' uur slaap' : 'Slaap niet ingevuld'}</span>
+            {todayWellness.restingHeartRate ? <span>{todayWellness.restingHeartRate} bpm rusthartslag</span> : null}
+            {todayWellness.recoveryScore ? <div className="wellness-entry-score"><EffortDots value={todayWellness.recoveryScore} /><small>herstelgevoel</small></div> : null}
+          </div> : <p className="muted">Je hebt vandaag nog niets ingevuld.</p>}
+          {wellness.filter((entry) => entry.date !== todayWellness?.date).slice(0, 4).map((entry) => (
+            <div className="wellness-entry compact" key={entry.id}>
+              <strong>{dateLabel(entry.date, { day: 'numeric', month: 'short', year: 'numeric' })}</strong>
+              <span>{entry.recoveryScore ? 'Herstelgevoel ' + entry.recoveryScore + '/5' : entry.sleepHours ? entry.sleepHours + ' uur slaap' : 'Invoer opgeslagen'}</span>
+            </div>
+          ))}
+        </div>
+      </aside>
+    </div>
+  )
 }
 
 function ProfileView({ data, draft, setDraft, paces, onSubmit, onConnect, onSync, syncingStrava, onDisconnect, demoMode }: { data: DashboardData; draft: ProfileDraft; setDraft: React.Dispatch<React.SetStateAction<ProfileDraft>>; paces: ReturnType<typeof calculateTrainingPaces>; onSubmit: (event: React.FormEvent<HTMLFormElement>) => void; onConnect: () => void; onSync: () => void; syncingStrava: boolean; onDisconnect: () => void; demoMode: boolean }) {
-  const days = [{ value: 1, label: 'Ma' }, { value: 2, label: 'Di' }, { value: 3, label: 'Wo' }, { value: 4, label: 'Do' }, { value: 5, label: 'Vr' }, { value: 6, label: 'Za' }, { value: 0, label: 'Zo' }]
-  function toggleDay(value: number) {
-    const selected = draft.days.includes(value) ? draft.days.filter((day) => day !== value) : [...draft.days, value]
-    if (selected.length <= 3) setDraft({ ...draft, days: selected })
-  }
-  return <div className="profile-layout"><form className="profile-form-card" onSubmit={onSubmit}><div className="section-heading"><div><p className="eyebrow">MARATHONINSTELLINGEN</p><h2>Jouw startpunt</h2></div><span className="profile-avatar">{data.profile.name.charAt(0)}</span></div><label className="field full"><span>Naam</span><input value={data.profile.name} readOnly /></label><div className="form-row"><label className="field"><span>Marathondatum</span><input type="date" required value={draft.marathonDate} onChange={(event) => setDraft({ ...draft, marathonDate: event.target.value })} /></label><label className="field"><span>Gewenste streeftijd <small>uu:mm:ss</small></span><input required pattern="\d{2}:\d{2}:\d{2}" value={draft.goalTime} onChange={(event) => setDraft({ ...draft, goalTime: event.target.value })} placeholder="04:00:00" /></label></div><div className="field full"><span>Planlengte</span><div className="plan-length-options">{([12, 16, 20] as const).map((length) => <button type="button" key={length} className={draft.planLength === length ? 'selected' : ''} onClick={() => setDraft({ ...draft, planLength: length })}><strong>{length}</strong><span>weken</span></button>)}</div></div><div className="field full"><span>Vaste trainingsdagen <small>kies er precies drie</small></span><div className="day-options">{days.map((day) => <button type="button" key={day.value} className={draft.days.includes(day.value) ? 'selected' : ''} onClick={() => toggleDay(day.value)}>{day.label}</button>)}</div></div><label className="optional-setting"><input type="checkbox" checked={draft.optional} onChange={(event) => setDraft({ ...draft, optional: event.target.checked })} /><span><strong>Optionele vierde training beschikbaar</strong><small>Rustige herstelduurloop of korte techniektraining.</small></span></label><div className="field full"><span>Recente wedstrijdtijd <small>voor een eerste tempo-indicatie</small></span><div className="form-row"><input type="number" min="1" step="0.1" aria-label="Wedstrijdafstand in kilometers" value={draft.raceDistance} onChange={(event) => setDraft({ ...draft, raceDistance: event.target.value })} /><input value={draft.raceTime} aria-label="Wedstrijdtijd" onChange={(event) => setDraft({ ...draft, raceTime: event.target.value })} placeholder="00:50:00" /></div></div><div className="pace-preview"><div><span className="small-label">EERSTE TEMPO-INDICATIE</span><span className="pace-preview-note">Richtlijn op basis van je wedstrijdresultaat; pas aan op gevoel en omstandigheden.</span></div>{paces ? <div className="pace-preview-grid"><span><small>E</small><b>{formatPace(paces.easy[0])}–{formatPace(paces.easy[1])}</b></span><span><small>M</small><b>{formatPace(paces.marathon)}</b></span><span><small>T</small><b>{formatPace(paces.threshold[0])}–{formatPace(paces.threshold[1])}</b></span><span><small>I</small><b>{formatPace(paces.interval[0])}–{formatPace(paces.interval[1])}</b></span></div> : <p className="muted">Vul een geldig resultaat in om een indicatie te zien.</p>}</div><button className="button button-primary">Plan opslaan <Icon name="arrow" size={16} /></button></form>
-    <aside className="profile-side"><div className="strava-card"><div className="strava-logo"><span className="strava-mark">S</span><div><strong>Strava</strong><span>{data.stravaConnected ? 'Verbonden' : demoMode && data.activities.some((activity) => activity.source === 'strava') ? 'Verbonden in voorbeeld' : 'Nog niet gekoppeld'}</span></div></div><p>Activiteiten worden automatisch opgehaald. Beschikbare laps of blokken worden getoond; zonder die gegevens blijft de totale training zichtbaar.</p>{data.stravaConnected && !demoMode ? <div className="strava-actions"><button type="button" className="button button-outline full-width" onClick={onSync} disabled={syncingStrava}><Icon name="history" size={16} /> {syncingStrava ? 'Synchroniseren…' : 'Nu synchroniseren'}</button><button type="button" className="text-button subtle" onClick={onDisconnect}>Koppeling verwijderen</button></div> : <button type="button" className="button button-outline full-width" onClick={onConnect}><Icon name="link" size={16} /> Strava koppelen</button>}<small>Je Strava-wachtwoord wordt nooit opgeslagen.</small></div><div className="profile-help"><span className="aside-icon lime"><Icon name="spark" /></span><h3>Gebruik je tempozones flexibel</h3><p>Tempo is een hulpmiddel. Hartslag, praattempo, ervaren inspanning en omstandigheden geven extra context.</p><PaceStrip /></div><details className="zone-reference"><summary><span><strong>Hartslagzones volgens All4Running</strong><small>Open voor uitleg en praattempo</small></span><Icon name="chevron" size={18} /></summary><div className="zone-reference-list"><div><b>Z1</b><span><strong>Rustig</strong><small>&lt;75% · makkelijk praten</small></span></div><div><b>Z2</b><span><strong>Gecontroleerd</strong><small>75–82% · zinnen worden korter</small></span></div><div><b>Z3</b><span><strong>Vlot / drempel</strong><small>82–88% · korte zinnen</small></span></div><div><b>Z4</b><span><strong>Intensief</strong><small>89–92% · enkele woorden</small></span></div><div><b>Z5</b><span><strong>Korte versnelling</strong><small>&gt;92% · zwaar hijgen</small></span></div></div><p className="zone-note">Percentages zijn een richtlijn op basis van maximale hartslag. Gebruik ook je ademhaling en ervaren inspanning; hartslag hoeft niet ingevuld te zijn.</p><a className="zone-source" href="https://all4running.nl/blog/app/uploads/2025/05/HardloopschemaMarathonGevorderd.pdf" target="_blank" rel="noreferrer">Bekijk het All4Running-uitgangsschema <span>↗</span></a></details><div className="profile-footnote"><Icon name="shield" size={16} /><span>Je account en trainingsgegevens zijn alleen zichtbaar volgens de coach-atleettoewijzing.</span></div></aside></div>
+  return (
+    <div className="profile-layout">
+      <form className="profile-form-card" onSubmit={onSubmit}>
+        <div className="section-heading">
+          <div><p className="eyebrow">MARATHONINSTELLINGEN</p><h2>Jouw startpunt</h2></div>
+          <span className="profile-avatar">{data.profile.name.charAt(0)}</span>
+        </div>
+        <label className="field full"><span>Naam</span><input value={data.profile.name} readOnly /></label>
+        <div className="form-row">
+          <label className="field"><span>Marathondatum</span><input type="date" min={todayDateISO()} required value={draft.marathonDate} onChange={(event) => setDraft({ ...draft, marathonDate: event.target.value })} /></label>
+          <label className="field"><span>Gewenste streeftijd <small>uu:mm:ss</small></span><input required pattern="\d{2}:\d{2}:\d{2}" value={draft.goalTime} onChange={(event) => setDraft({ ...draft, goalTime: event.target.value })} placeholder="04:00:00" /></label>
+        </div>
+        <PlanTimingNote draft={draft} />
+        <div className="field full">
+          <span>Planlengte</span>
+          <div className="plan-length-options">{([12, 16, 20] as const).map((length) => <button type="button" key={length} aria-pressed={draft.planLength === length} className={draft.planLength === length ? 'selected' : ''} onClick={() => setDraft({ ...draft, planLength: length })}><strong>{length}</strong><span>weken</span></button>)}</div>
+        </div>
+        <TrainingDaysControl draft={draft} setDraft={setDraft} />
+        <div className="field full">
+          <span>Recente wedstrijdtijd <small>voor een eerste tempo-indicatie</small></span>
+          <div className="form-row">
+            <input type="number" min="1" step="0.1" aria-label="Wedstrijdafstand in kilometers" value={draft.raceDistance} onChange={(event) => setDraft({ ...draft, raceDistance: event.target.value })} />
+            <input value={draft.raceTime} aria-label="Wedstrijdtijd" onChange={(event) => setDraft({ ...draft, raceTime: event.target.value })} placeholder="00:50:00" />
+          </div>
+        </div>
+        <div className="pace-preview">
+          <div><span className="small-label">EERSTE TEMPO-INDICATIE</span><span className="pace-preview-note">Richtlijn op basis van je wedstrijdresultaat; pas aan op gevoel en omstandigheden.</span></div>
+          {paces ? <div className="pace-preview-grid"><span><small>E</small><b>{formatPace(paces.easy[0])}–{formatPace(paces.easy[1])}</b></span><span><small>M</small><b>{formatPace(paces.marathon)}</b></span><span><small>T</small><b>{formatPace(paces.threshold[0])}–{formatPace(paces.threshold[1])}</b></span><span><small>I</small><b>{formatPace(paces.interval[0])}–{formatPace(paces.interval[1])}</b></span></div> : <p className="muted">Vul een geldig resultaat in om een indicatie te zien.</p>}
+        </div>
+        <button className="button button-primary">Plan opslaan <Icon name="arrow" size={16} /></button>
+      </form>
+      <aside className="profile-side">
+        <div className="strava-card">
+          <div className="strava-logo"><span className="strava-mark">S</span><div><strong>Strava</strong><span>{data.stravaConnected ? 'Verbonden' : demoMode && data.activities.some((activity) => activity.source === 'strava') ? 'Verbonden in voorbeeld' : 'Nog niet gekoppeld'}</span></div></div>
+          <p>Activiteiten worden automatisch opgehaald. Beschikbare laps of blokken worden getoond; zonder die gegevens blijft de totale training zichtbaar.</p>
+          {data.stravaConnected && !demoMode
+            ? <div className="strava-actions"><button type="button" className="button button-outline full-width" onClick={onSync} disabled={syncingStrava}><Icon name="history" size={16} /> {syncingStrava ? 'Synchroniseren…' : 'Nu synchroniseren'}</button><button type="button" className="text-button subtle" onClick={onDisconnect}>Koppeling verwijderen</button></div>
+            : <button type="button" className="button button-outline full-width" onClick={onConnect}><Icon name="link" size={16} /> Strava koppelen</button>}
+          <small>Je Strava-wachtwoord wordt nooit opgeslagen.</small>
+        </div>
+        <div className="profile-help"><span className="aside-icon lime"><Icon name="spark" /></span><h3>Gebruik je tempozones flexibel</h3><p>Tempo is een hulpmiddel. Hartslag, praattempo, ervaren inspanning en omstandigheden geven extra context.</p><PaceStrip /></div>
+        <details className="zone-reference"><summary><span><strong>Hartslagzones volgens All4Running</strong><small>Open voor uitleg en praattempo</small></span><Icon name="chevron" size={18} /></summary><div className="zone-reference-list"><div><b>Z1</b><span><strong>Rustig</strong><small>&lt;75% · makkelijk praten</small></span></div><div><b>Z2</b><span><strong>Gecontroleerd</strong><small>75–82% · zinnen worden korter</small></span></div><div><b>Z3</b><span><strong>Vlot / drempel</strong><small>82–88% · korte zinnen</small></span></div><div><b>Z4</b><span><strong>Intensief</strong><small>89–92% · enkele woorden</small></span></div><div><b>Z5</b><span><strong>Korte versnelling</strong><small>&gt;92% · zwaar hijgen</small></span></div></div><p className="zone-note">Percentages zijn een richtlijn op basis van maximale hartslag. Gebruik ook je ademhaling en ervaren inspanning; hartslag hoeft niet ingevuld te zijn.</p><a className="zone-source" href="https://all4running.nl/blog/app/uploads/2025/05/HardloopschemaMarathonGevorderd.pdf" target="_blank" rel="noreferrer">Bekijk het All4Running-uitgangsschema <span>↗</span></a></details>
+        <div className="profile-footnote"><Icon name="shield" size={16} /><span>Je account en trainingsgegevens zijn alleen zichtbaar volgens de coach-atleettoewijzing.</span></div>
+      </aside>
+    </div>
+  )
 }
 
 function CoachView({ data, onAthlete, onSuggestions, onUpdateSuggestion }: { data: DashboardData; onAthlete: (athlete: AthleteSummary) => void; onSuggestions: () => void; onUpdateSuggestion: (suggestion: CoachSuggestion, status: CoachSuggestion['status']) => void }) {

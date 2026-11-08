@@ -1,6 +1,7 @@
 import 'server-only'
 import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { formatPace, currentWeekNumber } from '@/lib/training-plan'
+import { todayDateISO } from '@/lib/dates'
 import type { PlanWeek } from '@/lib/training-plan'
 import type { AppRole, AthleteSummary, DashboardData, RunActivity, WellnessEntry } from '@/lib/types'
 
@@ -165,7 +166,9 @@ async function loadPlan(supabase: Awaited<ReturnType<typeof import('@/lib/supaba
     }
   })
   const length = Number(plan.plan_length) as 12 | 16 | 20
-  const today = new Date()
+  const today = new Date(todayDateISO() + 'T12:00:00.000Z')
+  const optionalWorkout = workouts.find((workout) => Boolean(workout.is_optional))
+  const optionalTrainingDay = optionalWorkout ? new Date(String(optionalWorkout.workout_date) + 'T12:00:00.000Z').getUTCDay() : 6
   return {
     length,
     marathonDate: String(plan.marathon_date),
@@ -174,6 +177,7 @@ async function loadPlan(supabase: Awaited<ReturnType<typeof import('@/lib/supaba
     weeks: planWeeks,
     trainingDays: Array.isArray(plan.training_days) ? plan.training_days.map(Number) : [2, 4, 0],
     includeOptionalFourth: Boolean(plan.has_optional_fourth),
+    optionalTrainingDay,
   }
 }
 
@@ -205,7 +209,7 @@ async function loadCoachData(supabase: Awaited<ReturnType<typeof import('@/lib/s
     const latestActivity = activities[0]
     const lastFeedback = latestActivity?.effort ? ({ easier: 'Makkelijker dan verwacht', as_expected: 'Zoals verwacht', harder: 'Zwaarder dan verwacht', not_good: 'Niet goed gegaan' } as const)[latestActivity.effort] : undefined
     const lastLong = plan?.weeks.flatMap((week) => week.workouts).filter((workout) => workout.type === 'long' && workout.status === 'completed').sort((a, b) => b.date.localeCompare(a.date))[0]
-    const overdue = required.filter((workout) => workout.date < new Date().toISOString().slice(0, 10) && workout.status === 'planned').length
+    const overdue = required.filter((workout) => workout.date < todayDateISO() && workout.status === 'planned').length
     const risk: AthleteSummary['risk'] = overdue >= 2 ? 'red' : latestActivity?.effort === 'harder' || latestActivity?.effort === 'not_good' ? 'orange' : 'green'
     const marathonDate = plan?.marathonDate ?? ''
     return {

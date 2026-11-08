@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   title: BRAND.appName + ' ' + BRAND.byline,
   description: 'Persoonlijke marathontraining met overzicht voor atleet en coach.',
   applicationName: BRAND.appName,
-  icons: { icon: '/favicon.svg' },
+  icons: { icon: '/marathon-coach-mark.png' },
 }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

@@ -1,3 +1,5 @@
+import { todayDateISO } from '@/lib/dates'
+
 export type PlanLength = 12 | 16 | 20
 export type Phase = 'basis' | 'ontwikkeling' | 'marathonspecifiek' | 'taper'
 export type WorkoutStatus = 'planned' | 'completed' | 'adjusted' | 'skipped'
@@ -44,6 +46,7 @@ export type PlanInput = {
   length: PlanLength
   trainingDays?: number[]
   includeOptionalFourth?: boolean
+  optionalTrainingDay?: number
   goalTimeSeconds?: number
   startingWeeklyKm?: number
 }
@@ -90,8 +93,9 @@ const PHASE_LABELS: Record<Phase, string> = {
 }
 
 function utcDate(date: string): Date {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Vul een geldige marathondatum in.')
   const value = new Date(date + 'T12:00:00.000Z')
-  if (Number.isNaN(value.getTime())) throw new Error('Vul een geldige marathondatum in.')
+  if (Number.isNaN(value.getTime()) || dateOnly(value) !== date) throw new Error('Vul een geldige marathondatum in.')
   return value
 }
 
@@ -110,6 +114,22 @@ function dateInWeek(weekStart: Date, weekday: number): Date {
   const result = new Date(weekStart)
   result.setUTCDate(result.getUTCDate() + (weekday === 0 ? 6 : weekday - 1))
   return result
+}
+
+export function getPlanStartDate(input: Pick<PlanInput, 'marathonDate' | 'length' | 'trainingDays' | 'includeOptionalFourth' | 'optionalTrainingDay'>): string {
+  const days = [...(input.trainingDays ?? [2, 4, 0])]
+  if (days.length !== 3 || new Set(days).size !== 3 || days.some((day) => !Number.isInteger(day) || day < 0 || day > 6)) {
+    throw new Error('Kies drie verschillende vaste trainingsdagen.')
+  }
+  const optionalTrainingDay = input.optionalTrainingDay ?? 6
+  if (input.includeOptionalFourth && (!Number.isInteger(optionalTrainingDay) || optionalTrainingDay < 0 || optionalTrainingDay > 6 || days.includes(optionalTrainingDay))) {
+    throw new Error('Kies voor de optionele training een dag die niet al bij je vaste dagen staat.')
+  }
+  const raceWeekMonday = mondayOf(utcDate(input.marathonDate))
+  raceWeekMonday.setUTCDate(raceWeekMonday.getUTCDate() - (input.length - 1) * 7)
+  const firstWeekDays = [...days, ...(input.includeOptionalFourth ? [optionalTrainingDay] : [])]
+  const earliestDay = firstWeekDays.sort((a, b) => (a === 0 ? 6 : a - 1) - (b === 0 ? 6 : b - 1))[0]
+  return dateOnly(dateInWeek(raceWeekMonday, earliestDay))
 }
 
 function phaseFor(length: PlanLength, week: number): Phase {
@@ -301,7 +321,17 @@ export function generatePlan(input: PlanInput): PlanWeek[] {
   if (days.length !== 3 || new Set(days).size !== 3) {
     throw new Error('Kies drie verschillende vaste trainingsdagen.')
   }
+  const optionalTrainingDay = input.optionalTrainingDay ?? 6
+  if (input.includeOptionalFourth && (!Number.isInteger(optionalTrainingDay) || optionalTrainingDay < 0 || optionalTrainingDay > 6 || days.includes(optionalTrainingDay))) {
+    throw new Error('Kies voor de optionele training een dag die niet al bij je vaste dagen staat.')
+  }
   const raceDate = utcDate(input.marathonDate)
+  if (dateOnly(raceDate) < todayDateISO()) throw new Error('De marathondatum ligt in het verleden. Kies een toekomstige datum.')
+  const firstWorkoutDate = getPlanStartDate(input)
+  if (firstWorkoutDate < todayDateISO()) {
+    const startLabel = new Intl.DateTimeFormat('nl-NL', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Amsterdam' }).format(utcDate(firstWorkoutDate))
+    throw new Error(`Dit schema zou starten op ${startLabel}, in het verleden. Kies een korter schema of een latere marathondatum.`)
+  }
   const raceWeekMonday = mondayOf(raceDate)
   const recoveryWeeks = RECOVERY_WEEKS[input.length]
   const weeks: PlanWeek[] = []
@@ -322,7 +352,7 @@ export function generatePlan(input: PlanInput): PlanWeek[] {
     })
 
     if (input.includeOptionalFourth) {
-      const optionalDate = dateInWeek(weekStart, 6)
+      const optionalDate = dateInWeek(weekStart, optionalTrainingDay)
       if (optionalDate < raceDate) {
         sessions.push({
           id: 'optional-' + week,

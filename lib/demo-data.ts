@@ -1,4 +1,5 @@
 import { currentWeekNumber, generatePlan, phaseLabel } from '@/lib/training-plan'
+import { todayDateISO } from '@/lib/dates'
 import type { DashboardData, RunActivity } from '@/lib/types'
 
 function addDays(date: Date, days: number): Date {
@@ -8,7 +9,7 @@ function addDays(date: Date, days: number): Date {
 }
 
 function dateString(date: Date): string {
-  return date.toISOString().slice(0, 10)
+  return todayDateISO(date)
 }
 
 function paceLabel(durationMinutes: number, distanceKm: number): string {
@@ -18,12 +19,14 @@ function paceLabel(durationMinutes: number, distanceKm: number): string {
 
 export function createDemoData(now = new Date()): DashboardData {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const marathonDate = dateString(addDays(today, 84))
+  const marathonDate = dateString(addDays(today, 112))
+  const noorMarathonDate = dateString(addDays(today, 140))
   const weeks = generatePlan({
     marathonDate,
     length: 16,
     trainingDays: [2, 4, 0],
     includeOptionalFourth: true,
+    optionalTrainingDay: 6,
     goalTimeSeconds: 4 * 3600,
   })
   const currentWeek = currentWeekNumber(weeks, today)
@@ -70,7 +73,7 @@ export function createDemoData(now = new Date()): DashboardData {
   const coachPlans = {
     demo: weeks,
     joris: generatePlan({ marathonDate, length: 16, trainingDays: [2, 4, 0], includeOptionalFourth: true, goalTimeSeconds: 3 * 3600 + 45 * 60 }),
-    noor: generatePlan({ marathonDate, length: 20, trainingDays: [2, 4, 0], includeOptionalFourth: true, goalTimeSeconds: 4 * 3600 + 20 * 60 }),
+    noor: generatePlan({ marathonDate: noorMarathonDate, length: 20, trainingDays: [2, 4, 0], includeOptionalFourth: true, optionalTrainingDay: 6, goalTimeSeconds: 4 * 3600 + 20 * 60 }),
   }
   return {
     profile: { id: 'demo-athlete', name: 'Demo-atleet', role: 'athlete' },
@@ -83,6 +86,7 @@ export function createDemoData(now = new Date()): DashboardData {
       weeks,
       trainingDays: [2, 4, 0],
       includeOptionalFourth: true,
+      optionalTrainingDay: 6,
     },
     activities,
     wellness: [],
@@ -123,7 +127,7 @@ export function createDemoData(now = new Date()): DashboardData {
       {
         id: 'athlete-3',
         name: 'Noor Bakker',
-        marathonDate,
+        marathonDate: noorMarathonDate,
         goalTime: '04:20:00',
         planLength: 20,
         currentWeek: Math.min(20, currentWeek + 2),
