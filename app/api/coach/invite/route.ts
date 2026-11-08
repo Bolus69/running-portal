@@ -17,7 +17,18 @@ export async function POST(request: Request) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return jsonError('Vul een geldig e-mailadres in.', 400)
   let admin
   try { admin = createAdminSupabaseClient() } catch { return jsonError('De beveiligde uitnodigingsfunctie is nog niet ingesteld.', 503) }
-  const callback = new URL('/auth/accept', request.url).toString()
+  const requestOrigin = new URL(request.url).origin
+  const configuredPreviewUrl = process.env.VERCEL_ENV === 'preview' ? process.env.NEXT_PUBLIC_APP_URL : undefined
+  let callbackOrigin = requestOrigin
+  if (configuredPreviewUrl) {
+    try {
+      const previewUrl = new URL(configuredPreviewUrl)
+      if (previewUrl.protocol === 'https:') callbackOrigin = previewUrl.origin
+    } catch {
+      // Keep the request origin when the optional Preview URL is invalid.
+    }
+  }
+  const callback = new URL('/auth/accept', callbackOrigin).toString()
   const { data: invitation, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, { data: { full_name: name }, redirectTo: callback })
   const athleteId = invitation.user?.id
   if (inviteError || !athleteId) return jsonError('De uitnodiging kon niet worden verstuurd. Controleer of het adres al een account heeft.', 409)
