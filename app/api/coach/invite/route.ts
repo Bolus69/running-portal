@@ -18,7 +18,9 @@ export async function POST(request: Request) {
   let admin
   try { admin = createAdminSupabaseClient() } catch { return jsonError('De beveiligde uitnodigingsfunctie is nog niet ingesteld.', 503) }
   const requestOrigin = new URL(request.url).origin
-  const configuredPreviewUrl = process.env.VERCEL_ENV === 'preview' ? process.env.NEXT_PUBLIC_APP_URL : undefined
+  const configuredPreviewUrl = process.env.VERCEL_ENV === 'preview'
+    ? process.env.STRAVA_WEBHOOK_CALLBACK_ORIGIN || process.env.NEXT_PUBLIC_APP_URL
+    : undefined
   let callbackOrigin = requestOrigin
   if (configuredPreviewUrl) {
     try {
