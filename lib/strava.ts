@@ -66,46 +66,100 @@ function stravaClientCredentials() {
   return { clientId, clientSecret }
 }
 
-export async function ensureStravaWebhookSubscription(callbackOrigin: string): Promise<void> {
-  const { clientId, clientSecret } = stravaClientCredentials()
-  const verifyToken = process.env.STRAVA_WEBHOOK_SECRET
-  if (!verifyToken) throw new Error('Strava webhook verification is not configured.')
+export type StravaWebhookIssue =
+  | 'credentials_missing'
+  | 'webhook_secret_missing'
+  | 'preview_origin_missing'
+  | 'preview_bypass_missing'
+  | 'strava_auth_rejected'
+  | 'subscription_check_failed'
+  | 'subscription_conflict'
+  | 'callback_rejected'
+  | 'registration_rejected'
+  | 'registration_unconfirmed'
+  | 'network_error'
 
-  const credentials = new URLSearchParams({ client_id: clientId, client_secret: clientSecret })
-  const listResponse = await fetch('https://www.strava.com/api/v3/push_subscriptions?' + credentials.toString(), { cache: 'no-store' })
-  if (!listResponse.ok) throw new Error('Existing Strava webhook subscriptions could not be checked.')
-  const existing = await listResponse.json() as Array<{ id?: number; callback_url?: string }>
-  const stableOrigin = process.env.VERCEL_ENV === 'preview'
-    ? process.env.STRAVA_WEBHOOK_CALLBACK_ORIGIN || callbackOrigin
-    : callbackOrigin
-  const callback = new URL('/api/strava/webhook', stableOrigin)
+export class StravaWebhookSetupError extends Error {
+  constructor(public readonly code: StravaWebhookIssue) {
+    super(code)
+    this.name = 'StravaWebhookSetupError'
+  }
+}
+
+export async function ensureStravaWebhookSubscription(callbackOrigin: string): Promise<void> {
+  const clientId = process.env.STRAVA_CLIENT_ID
+  const clientSecret = process.env.STRAVA_CLIENT_SECRET
+  if (!clientId || !clientSecret) throw new StravaWebhookSetupError('credentials_missing')
+  const verifyToken = process.env.STRAVA_WEBHOOK_SECRET
+  if (!verifyToken) throw new StravaWebhookSetupError('webhook_secret_missing')
+
+  const isPreview = process.env.VERCEL_ENV === 'preview'
+  if (isPreview && !process.env.STRAVA_WEBHOOK_CALLBACK_ORIGIN) throw new StravaWebhookSetupError('preview_origin_missing')
+  if (isPreview && !process.env.VERCEL_AUTOMATION_BYPASS_SECRET) throw new StravaWebhookSetupError('preview_bypass_missing')
+  const stableOrigin = isPreview ? String(process.env.STRAVA_WEBHOOK_CALLBACK_ORIGIN) : callbackOrigin
+  let callback: URL
+  try {
+    callback = new URL('/api/strava/webhook', stableOrigin)
+  } catch {
+    throw new StravaWebhookSetupError('preview_origin_missing')
+  }
   callback.searchParams.set('token', verifyToken)
-  if (process.env.VERCEL_ENV === 'preview' && process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
+  if (isPreview && process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
     callback.searchParams.set('x-vercel-protection-bypass', process.env.VERCEL_AUTOMATION_BYPASS_SECRET)
   }
   const callbackUrl = callback.toString()
-
-  if (Array.isArray(existing) && existing.some((item) => item.callback_url === callbackUrl)) return
-  if (Array.isArray(existing) && existing.length > 0) {
-    throw new Error('A Strava webhook subscription already uses a different callback URL.')
+  const credentials = new URLSearchParams({ client_id: clientId, client_secret: clientSecret })
+  let listResponse: Response
+  try {
+    listResponse = await fetch('https://www.strava.com/api/v3/push_subscriptions?' + credentials.toString(), { cache: 'no-store' })
+  } catch {
+    throw new StravaWebhookSetupError('network_error')
+  }
+  if (!listResponse.ok) {
+    throw new StravaWebhookSetupError(listResponse.status === 401 || listResponse.status === 403 ? 'strava_auth_rejected' : 'subscription_check_failed')
+  }
+  let existing: Array<{ id?: number; callback_url?: string }>
+  try {
+    const body: unknown = await listResponse.json()
+    if (!Array.isArray(body)) throw new Error('invalid response')
+    existing = body as Array<{ id?: number; callback_url?: string }>
+  } catch {
+    throw new StravaWebhookSetupError('subscription_check_failed')
   }
 
-  const createResponse = await fetch('https://www.strava.com/api/v3/push_subscriptions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      callback_url: callbackUrl,
-      verify_token: verifyToken,
-    }),
-    cache: 'no-store',
-  })
-  if (!createResponse.ok) throw new Error('Strava webhook registration was not accepted.')
-  const subscription = await createResponse.json() as { id?: number }
-  if (!subscription.id) throw new Error('Strava did not confirm the webhook subscription.')
-}
+  if (existing.some((item) => item.callback_url === callbackUrl)) return
+  if (existing.length > 0) throw new StravaWebhookSetupError('subscription_conflict')
 
+  let createResponse: Response
+  try {
+    createResponse = await fetch('https://www.strava.com/api/v3/push_subscriptions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        callback_url: callbackUrl,
+        verify_token: verifyToken,
+      }),
+      cache: 'no-store',
+    })
+  } catch {
+    throw new StravaWebhookSetupError('network_error')
+  }
+  if (!createResponse.ok) {
+    if (createResponse.status === 401 || createResponse.status === 403) throw new StravaWebhookSetupError('strava_auth_rejected')
+    if (createResponse.status === 400) throw new StravaWebhookSetupError('callback_rejected')
+    if (createResponse.status === 409) throw new StravaWebhookSetupError('subscription_conflict')
+    throw new StravaWebhookSetupError('registration_rejected')
+  }
+  let subscription: { id?: number }
+  try {
+    subscription = await createResponse.json() as { id?: number }
+  } catch {
+    throw new StravaWebhookSetupError('registration_unconfirmed')
+  }
+  if (!subscription.id) throw new StravaWebhookSetupError('registration_unconfirmed')
+}
 async function refreshAccessToken(admin: AdminClient, athleteId: string, connection: Row): Promise<string> {
   const expiry = new Date(String(connection.expires_at)).getTime()
   const accessToken = decryptStravaToken(String(connection.access_token_enc))
