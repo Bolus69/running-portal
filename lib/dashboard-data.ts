@@ -244,9 +244,11 @@ async function loadCoachData(supabase: Awaited<ReturnType<typeof import('@/lib/s
       createdAt: String(row.created_at),
     }
   })
+  const admin = createAdminSupabaseClient()
+  const { data: stravaConnection } = await admin.from('strava_connections').select('is_active').eq('athlete_id', userId).maybeSingle()
   return {
     profile: { id: userId, name: fullName, role: 'coach' },
-    stravaConnected: false,
+    stravaConnected: Boolean(stravaConnection?.is_active),
     plan: null,
     activities: [],
     wellness: [],
