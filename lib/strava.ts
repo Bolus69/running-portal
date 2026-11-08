@@ -74,6 +74,7 @@ export type StravaWebhookIssue =
   | 'preview_bypass_rejected'
   | 'callback_url_too_long'
   | 'callback_probe_failed'
+  | 'callback_redirected'
   | 'callback_response_invalid'
   | 'callback_too_slow'
   | 'strava_auth_rejected'
@@ -163,11 +164,14 @@ export async function ensureStravaWebhookSubscription(callbackOrigin: string): P
     const startedAt = Date.now()
     let probeResponse: Response
     try {
-      probeResponse = await fetch(probeUrl, { cache: 'no-store', signal: controller.signal })
+      probeResponse = await fetch(probeUrl, { cache: 'no-store', signal: controller.signal, redirect: 'manual' })
     } catch {
       throw new StravaWebhookSetupError('callback_probe_failed', 'timeout')
     } finally {
       clearTimeout(timeout)
+    }
+    if (probeResponse.status >= 300 && probeResponse.status < 400) {
+      throw new StravaWebhookSetupError('callback_redirected', 'HTTP ' + probeResponse.status)
     }
     if (probeResponse.status === 401 || probeResponse.status === 403) {
       throw new StravaWebhookSetupError('preview_bypass_rejected', 'HTTP ' + probeResponse.status)
