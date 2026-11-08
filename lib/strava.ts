@@ -70,8 +70,7 @@ export type StravaWebhookIssue =
   | 'credentials_missing'
   | 'webhook_secret_missing'
   | 'preview_origin_missing'
-  | 'preview_bypass_missing'
-  | 'preview_bypass_rejected'
+  | 'callback_protected'
   | 'callback_url_too_long'
   | 'callback_probe_failed'
   | 'callback_redirected'
@@ -116,7 +115,6 @@ export async function ensureStravaWebhookSubscription(callbackOrigin: string): P
 
   const isPreview = process.env.VERCEL_ENV === 'preview'
   if (isPreview && !process.env.STRAVA_WEBHOOK_CALLBACK_ORIGIN) throw new StravaWebhookSetupError('preview_origin_missing')
-  if (isPreview && !process.env.VERCEL_AUTOMATION_BYPASS_SECRET) throw new StravaWebhookSetupError('preview_bypass_missing')
   const stableOrigin = isPreview ? String(process.env.STRAVA_WEBHOOK_CALLBACK_ORIGIN) : callbackOrigin
   let callback: URL
   try {
@@ -125,9 +123,6 @@ export async function ensureStravaWebhookSubscription(callbackOrigin: string): P
     throw new StravaWebhookSetupError('preview_origin_missing')
   }
   callback.searchParams.set('token', verifyToken)
-  if (isPreview && process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
-    callback.searchParams.set('x-vercel-protection-bypass', process.env.VERCEL_AUTOMATION_BYPASS_SECRET)
-  }
   const callbackUrl = callback.toString()
   if (callbackUrl.length > 255) throw new StravaWebhookSetupError('callback_url_too_long', String(callbackUrl.length))
 
@@ -174,7 +169,7 @@ export async function ensureStravaWebhookSubscription(callbackOrigin: string): P
       throw new StravaWebhookSetupError('callback_redirected', 'HTTP ' + probeResponse.status)
     }
     if (probeResponse.status === 401 || probeResponse.status === 403) {
-      throw new StravaWebhookSetupError('preview_bypass_rejected', 'HTTP ' + probeResponse.status)
+      throw new StravaWebhookSetupError('callback_protected', 'HTTP ' + probeResponse.status)
     }
     if (!probeResponse.ok) throw new StravaWebhookSetupError('callback_probe_failed', 'HTTP ' + probeResponse.status)
     let probeBody: { 'hub.challenge'?: unknown }
