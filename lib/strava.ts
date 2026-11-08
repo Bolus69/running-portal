@@ -71,6 +71,11 @@ export type StravaWebhookIssue =
   | 'webhook_secret_missing'
   | 'preview_origin_missing'
   | 'preview_bypass_missing'
+  | 'preview_bypass_rejected'
+  | 'callback_url_too_long'
+  | 'callback_probe_failed'
+  | 'callback_response_invalid'
+  | 'callback_too_slow'
   | 'strava_auth_rejected'
   | 'subscription_check_failed'
   | 'subscription_conflict'
@@ -80,9 +85,24 @@ export type StravaWebhookIssue =
   | 'network_error'
 
 export class StravaWebhookSetupError extends Error {
-  constructor(public readonly code: StravaWebhookIssue) {
+  constructor(public readonly code: StravaWebhookIssue, public readonly detail?: string) {
     super(code)
     this.name = 'StravaWebhookSetupError'
+  }
+}
+
+async function safeStravaErrorDetail(response: Response): Promise<string> {
+  try {
+    const body = await response.json() as { errors?: Array<{ field?: unknown; code?: unknown }> }
+    const errors = Array.isArray(body.errors) ? body.errors : []
+    const detail = errors.slice(0, 3).map((item) => {
+      const field = typeof item.field === 'string' ? item.field.replace(/[^a-z0-9_-]/gi, '').slice(0, 32) : ''
+      const code = typeof item.code === 'string' ? item.code.replace(/[^a-z0-9_-]/gi, '').slice(0, 32) : ''
+      return [field, code].filter(Boolean).join(':')
+    }).filter(Boolean)
+    return detail.length ? detail.join(', ') : 'HTTP ' + response.status
+  } catch {
+    return 'HTTP ' + response.status
   }
 }
 
@@ -108,6 +128,8 @@ export async function ensureStravaWebhookSubscription(callbackOrigin: string): P
     callback.searchParams.set('x-vercel-protection-bypass', process.env.VERCEL_AUTOMATION_BYPASS_SECRET)
   }
   const callbackUrl = callback.toString()
+  if (callbackUrl.length > 255) throw new StravaWebhookSetupError('callback_url_too_long', String(callbackUrl.length))
+
   const credentials = new URLSearchParams({ client_id: clientId, client_secret: clientSecret })
   let listResponse: Response
   try {
@@ -116,7 +138,7 @@ export async function ensureStravaWebhookSubscription(callbackOrigin: string): P
     throw new StravaWebhookSetupError('network_error')
   }
   if (!listResponse.ok) {
-    throw new StravaWebhookSetupError(listResponse.status === 401 || listResponse.status === 403 ? 'strava_auth_rejected' : 'subscription_check_failed')
+    throw new StravaWebhookSetupError(listResponse.status === 401 || listResponse.status === 403 ? 'strava_auth_rejected' : 'subscription_check_failed', 'HTTP ' + listResponse.status)
   }
   let existing: Array<{ id?: number; callback_url?: string }>
   try {
@@ -129,6 +151,37 @@ export async function ensureStravaWebhookSubscription(callbackOrigin: string): P
 
   if (existing.some((item) => item.callback_url === callbackUrl)) return
   if (existing.length > 0) throw new StravaWebhookSetupError('subscription_conflict')
+
+  if (isPreview) {
+    const challenge = 'mc-' + randomBytes(12).toString('hex')
+    const probeUrl = new URL(callbackUrl)
+    probeUrl.searchParams.set('hub.mode', 'subscribe')
+    probeUrl.searchParams.set('hub.verify_token', verifyToken)
+    probeUrl.searchParams.set('hub.challenge', challenge)
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 1500)
+    const startedAt = Date.now()
+    let probeResponse: Response
+    try {
+      probeResponse = await fetch(probeUrl, { cache: 'no-store', signal: controller.signal })
+    } catch {
+      throw new StravaWebhookSetupError('callback_probe_failed', 'timeout')
+    } finally {
+      clearTimeout(timeout)
+    }
+    if (probeResponse.status === 401 || probeResponse.status === 403) {
+      throw new StravaWebhookSetupError('preview_bypass_rejected', 'HTTP ' + probeResponse.status)
+    }
+    if (!probeResponse.ok) throw new StravaWebhookSetupError('callback_probe_failed', 'HTTP ' + probeResponse.status)
+    let probeBody: { 'hub.challenge'?: unknown }
+    try {
+      probeBody = await probeResponse.json() as { 'hub.challenge'?: unknown }
+    } catch {
+      throw new StravaWebhookSetupError('callback_response_invalid')
+    }
+    if (probeBody['hub.challenge'] !== challenge) throw new StravaWebhookSetupError('callback_response_invalid')
+    if (Date.now() - startedAt > 2000) throw new StravaWebhookSetupError('callback_too_slow', String(Date.now() - startedAt) + 'ms')
+  }
 
   let createResponse: Response
   try {
@@ -147,10 +200,11 @@ export async function ensureStravaWebhookSubscription(callbackOrigin: string): P
     throw new StravaWebhookSetupError('network_error')
   }
   if (!createResponse.ok) {
-    if (createResponse.status === 401 || createResponse.status === 403) throw new StravaWebhookSetupError('strava_auth_rejected')
-    if (createResponse.status === 400) throw new StravaWebhookSetupError('callback_rejected')
-    if (createResponse.status === 409) throw new StravaWebhookSetupError('subscription_conflict')
-    throw new StravaWebhookSetupError('registration_rejected')
+    const detail = await safeStravaErrorDetail(createResponse)
+    if (createResponse.status === 401 || createResponse.status === 403) throw new StravaWebhookSetupError('strava_auth_rejected', detail)
+    if (createResponse.status === 400) throw new StravaWebhookSetupError('callback_rejected', detail)
+    if (createResponse.status === 409) throw new StravaWebhookSetupError('subscription_conflict', detail)
+    throw new StravaWebhookSetupError('registration_rejected', detail)
   }
   let subscription: { id?: number }
   try {
