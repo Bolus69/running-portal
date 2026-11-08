@@ -81,6 +81,7 @@ function stravaWebhookIssueMessage(issue?: string, detail?: string): string {
     preview_bypass_rejected: 'Vercel blokkeert de Strava-webhook; de Preview-bypass werkt niet voor dit adres.',
     callback_url_too_long: 'Het Strava-webhookadres is te lang. Er is een korter callbackadres nodig.',
     callback_probe_failed: 'De app kan het webhookadres niet zelf bereiken.',
+    callback_redirected: 'Het webhookadres stuurt eerst door naar een ander adres. Strava accepteert alleen direct HTTP 200.',
     callback_response_invalid: 'Het webhookadres geeft niet de verwachte Strava-controle terug.',
     callback_too_slow: 'Het webhookadres antwoordt te langzaam voor Strava.',
     registration_rejected: 'Strava heeft de automatische koppeling geweigerd.',
@@ -490,10 +491,11 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
     if (!email.includes('@')) return showToast('Vul een geldig e-mailadres in.')
     if (!demoMode) {
       const response = await fetch('/api/coach/invite', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, name: String(form.get('name') ?? '').trim() }) })
-      if (!response.ok) return showToast('Uitnodigen lukte niet. Controleer je coachrechten.')
+      const result = await response.json().catch(() => ({})) as { error?: string }
+      if (!response.ok) return showToast(result.error ?? 'Uitnodigen lukte niet. Probeer opnieuw.')
     }
     setModal(null)
-    showToast(demoMode ? 'Voorbeelduitnodiging verstuurd.' : 'Uitnodiging verstuurd naar ' + email + '.')
+    showToast(demoMode ? 'Demo: dit is alleen een voorbeeld; er wordt geen e-mail verstuurd.' : 'Uitnodiging aangevraagd voor ' + email + '. Controleer ook je spammap.')
   }
 
   function openCoachPlan(athlete: AthleteSummary) {
