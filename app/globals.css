@@ -224,6 +224,9 @@ h1, h2, h3 { font-family: 'Manrope', 'DM Sans', sans-serif; letter-spacing: -.6p
 .history-date { display: flex; flex-direction: column; align-items: center; min-width: 29px; color: #869087; line-height: 1.05; }.history-date strong { color: var(--ink); font-size: 16px; font-family: 'Manrope', sans-serif; }.history-date span { margin-top: 4px; font-size: 8px; text-transform: uppercase; }
 .history-activity-icon { width: 31px; height: 31px; display: grid; place-items: center; background: #e9f3ec; color: #5d8c61; border-radius: 9px; flex: 0 0 auto; }
 .history-main { flex: 1; min-width: 0; }.history-title-row { display: flex; align-items: center; gap: 9px; }.history-title-row h3 { margin: 0; font-size: 12px; }.source-pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 6px; border-radius: 5px; font-size: 8px; font-weight: 700; }.source-strava { color: #b7632b; background: #fbefe6; }.source-manual { color: #617266; background: #eff3ee; }
+.history-link-status { flex: 0 0 auto; margin-left: auto; padding: 4px 7px; border-radius: 99px; font-size: 8px; font-weight: 700; white-space: nowrap; }
+.history-link-status.linked { color: #4b8758; background: #e9f5e9; }
+.history-link-status.unlinked { color: #737a72; background: #f3f4ef; }
 .history-meta { display: flex; flex-wrap: wrap; gap: 7px 12px; color: #748077; font-size: 9px; margin-top: 8px; }.history-meta span { white-space: nowrap; }
 .history-feedback { display: flex; gap: 8px; color: #52654c; font-size: 9px; margin: 9px 0 0; }.history-feedback span { color: #9ba39b; }
 .history-note { color: #78847b; font-size: 9px; margin: 7px 0 0; }
