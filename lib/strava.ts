@@ -75,8 +75,14 @@ export async function ensureStravaWebhookSubscription(callbackOrigin: string): P
   const listResponse = await fetch('https://www.strava.com/api/v3/push_subscriptions?' + credentials.toString(), { cache: 'no-store' })
   if (!listResponse.ok) throw new Error('Existing Strava webhook subscriptions could not be checked.')
   const existing = await listResponse.json() as Array<{ id?: number; callback_url?: string }>
-  const callback = new URL('/api/strava/webhook', callbackOrigin)
+  const stableOrigin = process.env.VERCEL_ENV === 'preview'
+    ? process.env.STRAVA_WEBHOOK_CALLBACK_ORIGIN || callbackOrigin
+    : callbackOrigin
+  const callback = new URL('/api/strava/webhook', stableOrigin)
   callback.searchParams.set('token', verifyToken)
+  if (process.env.VERCEL_ENV === 'preview' && process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
+    callback.searchParams.set('x-vercel-protection-bypass', process.env.VERCEL_AUTOMATION_BYPASS_SECRET)
+  }
   const callbackUrl = callback.toString()
 
   if (Array.isArray(existing) && existing.some((item) => item.callback_url === callbackUrl)) return
