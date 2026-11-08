@@ -437,13 +437,14 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
     setSyncingStrava(true)
     try {
       const response = await fetch('/api/strava/sync', { method: 'POST' })
-      const result = await response.json().catch(() => ({})) as { imported?: number; error?: string }
+      const result = await response.json().catch(() => ({})) as { imported?: number; automaticSyncReady?: boolean; error?: string }
       if (!response.ok) {
         showToast(result.error ?? 'Synchroniseren lukte niet. Je bestaande geschiedenis blijft beschikbaar.')
         return
       }
       const imported = result.imported ?? 0
-      showToast(imported === 0 ? 'Geen nieuwe Strava-trainingen gevonden.' : imported + ' Strava-trainingen bijgewerkt.')
+      const syncMessage = imported === 0 ? 'Geen nieuwe Strava-trainingen gevonden.' : imported + ' Strava-trainingen bijgewerkt.'
+      showToast(result.automaticSyncReady ? syncMessage + ' Automatische synchronisatie is ingesteld.' : syncMessage + ' Automatische synchronisatie is nog niet actief.')
       router.refresh()
     } catch {
       showToast('De synchronisatie kon de server niet bereiken. Controleer je internetverbinding en probeer opnieuw.')
