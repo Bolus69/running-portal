@@ -245,12 +245,15 @@ async function loadCoachData(supabase: Awaited<ReturnType<typeof import('@/lib/s
     }
   })
   const admin = createAdminSupabaseClient()
-  const { data: stravaConnection } = await admin.from('strava_connections').select('is_active').eq('athlete_id', userId).maybeSingle()
+  const [{ data: stravaConnection }, activities] = await Promise.all([
+    admin.from('strava_connections').select('is_active').eq('athlete_id', userId).maybeSingle(),
+    loadActivities(supabase, userId),
+  ])
   return {
     profile: { id: userId, name: fullName, role: 'coach' },
     stravaConnected: Boolean(stravaConnection?.is_active),
     plan: null,
-    activities: [],
+    activities,
     wellness: [],
     athletes: athleteData,
     suggestions,
