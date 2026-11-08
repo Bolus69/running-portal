@@ -68,6 +68,24 @@ function formatTime(value: string): string {
 function effortLabel(value?: RunActivity['effort']): string {
   return ({ easier: 'Makkelijker dan verwacht', as_expected: 'Zoals verwacht', harder: 'Zwaarder dan verwacht', not_good: 'Niet goed gegaan' } as const)[value ?? 'as_expected']
 }
+function stravaWebhookIssueMessage(issue?: string): string {
+  const messages: Record<string, string> = {
+    credentials_missing: 'De automatische koppeling mist een Strava-instelling. Handmatig synchroniseren blijft werken.',
+    webhook_secret_missing: 'De beveiligde Strava-webhookinstelling ontbreekt in Preview.',
+    preview_origin_missing: 'Het vaste Preview-adres voor automatische synchronisatie ontbreekt.',
+    preview_bypass_missing: 'Vercel blokkeert de Strava-webhook: de Preview-bypassinstelling ontbreekt.',
+    strava_auth_rejected: 'Strava accepteert de appgegevens voor automatische synchronisatie niet. Controleer Client ID en Client Secret in Vercel Preview.',
+    subscription_check_failed: 'Strava kon de bestaande webhook niet controleren. Probeer het later opnieuw.',
+    subscription_conflict: 'Er staat al een oude Strava-webhook. Die moet eerst veilig worden vervangen.',
+    callback_rejected: 'Strava kon het Preview-adres niet controleren. Controleer de webhookinstellingen.',
+    registration_rejected: 'Strava heeft de automatische koppeling geweigerd.',
+    registration_unconfirmed: 'Strava heeft de automatische koppeling niet bevestigd.',
+    network_error: 'Strava was tijdelijk niet bereikbaar.',
+    setup_failed: 'De automatische koppeling kon niet worden ingesteld.',
+  }
+  return issue ? messages[issue] ?? messages.setup_failed : 'Automatische synchronisatie is nog niet actief.'
+}
+
 
 function StatusPill({ status }: { status: string }) {
   const labels: Record<string, string> = { planned: 'Gepland', completed: 'Uitgevoerd', adjusted: 'Aangepast', skipped: 'Overgeslagen' }
@@ -437,14 +455,14 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
     setSyncingStrava(true)
     try {
       const response = await fetch('/api/strava/sync', { method: 'POST' })
-      const result = await response.json().catch(() => ({})) as { imported?: number; automaticSyncReady?: boolean; error?: string }
+      const result = await response.json().catch(() => ({})) as { imported?: number; automaticSyncReady?: boolean; automaticSyncIssue?: string; error?: string }
       if (!response.ok) {
         showToast(result.error ?? 'Synchroniseren lukte niet. Je bestaande geschiedenis blijft beschikbaar.')
         return
       }
       const imported = result.imported ?? 0
       const syncMessage = imported === 0 ? 'Geen nieuwe Strava-trainingen gevonden.' : imported + ' Strava-trainingen bijgewerkt.'
-      showToast(result.automaticSyncReady ? syncMessage + ' Automatische synchronisatie is ingesteld.' : syncMessage + ' Automatische synchronisatie is nog niet actief.')
+      showToast(syncMessage + ' ' + (result.automaticSyncReady ? 'Automatische synchronisatie is ingesteld.' : stravaWebhookIssueMessage(result.automaticSyncIssue)))
       router.refresh()
     } catch {
       showToast('De synchronisatie kon de server niet bereiken. Controleer je internetverbinding en probeer opnieuw.')
