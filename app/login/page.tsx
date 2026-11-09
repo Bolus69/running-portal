@@ -23,6 +23,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             <form action={signIn} className="login-form">
               <label className="field"><span>E-mailadres</span><input required type="email" name="email" autoComplete="email" /></label>
               <label className="field"><span>Wachtwoord</span><input required type="password" name="password" autoComplete="current-password" /></label>
+              <Link className="login-reset-link" href="/forgot-password">Wachtwoord vergeten?</Link>
               {error && <p className="login-error" role="alert">{decodeURIComponent(error)}</p>}
               <button className="button button-primary full-width">Inloggen</button>
               <p className="login-help">Nog geen account? Vraag je coach om een uitnodiging.</p>

@@ -11,7 +11,7 @@ export async function PATCH(request: Request) {
   if (!body.workoutId || (body.status !== 'completed' && body.status !== 'skipped')) return jsonError('Ongeldige trainingsstatus.', 400)
   const allowedEfforts = ['easier', 'as_expected', 'harder', 'not_good']
   if (body.effort && (!allowedEfforts.includes(body.effort) || body.status !== 'completed')) return jsonError('Ongeldige trainingsfeedback.', 400)
-  const note = typeof body.note === 'string' ? body.note.trim().slice(0, 1000) : undefined
+  const note = typeof body.note === 'string' ? body.note.trim().slice(0, 200) : undefined
   const { data: workout } = await supabase.from('planned_workouts').select('id,athlete_id').eq('id', body.workoutId).eq('athlete_id', user.id).maybeSingle()
   if (!workout) return jsonError('Deze training hoort niet bij jouw schema.', 403)
   const { error } = await supabase.from('workout_feedback').upsert({

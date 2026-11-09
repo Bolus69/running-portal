@@ -5,6 +5,11 @@ export type Phase = 'basis' | 'ontwikkeling' | 'marathonspecifiek' | 'taper'
 export type WorkoutStatus = 'planned' | 'completed' | 'adjusted' | 'skipped'
 export type All4RunningZone = 1 | 2 | 3 | 4 | 5 | '4-5'
 export type TrainingType = 'easy' | 'quality' | 'long' | 'optional' | 'race'
+export type WorkoutFeedback = {
+  effort?: 'easier' | 'as_expected' | 'harder' | 'not_good'
+  note?: string
+  completedAt?: string
+}
 
 export type WorkoutStep = {
   kind: 'warmup' | 'easy' | 'work' | 'recovery' | 'cooldown' | 'strides'
@@ -31,6 +36,7 @@ export type PlannedWorkout = {
   steps: WorkoutStep[]
   status: WorkoutStatus
   optional: boolean
+  feedback?: WorkoutFeedback
 }
 
 export type PlanWeek = {

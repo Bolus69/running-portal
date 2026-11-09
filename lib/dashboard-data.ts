@@ -111,7 +111,7 @@ async function loadPlan(supabase: Awaited<ReturnType<typeof import('@/lib/supaba
   const workoutIds = workouts.map((item) => String(item.id))
   const [{ data: stepData }, { data: feedbackData }] = workoutIds.length ? await Promise.all([
     supabase.from('workout_steps').select('*').in('planned_workout_id', workoutIds).order('step_order'),
-    supabase.from('workout_feedback').select('planned_workout_id,state,effort,note').eq('athlete_id', athleteId).in('planned_workout_id', workoutIds),
+    supabase.from('workout_feedback').select('planned_workout_id,state,effort,note,completed_at').eq('athlete_id', athleteId).in('planned_workout_id', workoutIds),
   ]) : [{ data: [] }, { data: [] }]
   const steps = ((stepData ?? []) as unknown as Row[])
   const feedback = ((feedbackData ?? []) as unknown as Row[])
@@ -140,6 +140,13 @@ async function loadPlan(supabase: Awaited<ReturnType<typeof import('@/lib/supaba
       }))
       const checkinState = checkin?.state
       const state: PlanWeek['workouts'][number]['status'] = checkinState === 'completed' ? 'completed' : checkinState === 'skipped' ? 'skipped' : workout.state === 'adjusted' ? 'adjusted' : workout.state === 'skipped' ? 'skipped' : 'planned'
+      const feedbackEffort = ['easier', 'as_expected', 'harder', 'not_good'].includes(String(checkin?.effort))
+        ? String(checkin?.effort) as NonNullable<PlanWeek['workouts'][number]['feedback']>['effort']
+        : undefined
+      const feedbackNote = typeof checkin?.note === 'string' ? checkin.note : undefined
+      const feedback = checkinState === 'completed' && (feedbackEffort || feedbackNote)
+        ? { effort: feedbackEffort, note: feedbackNote || undefined, completedAt: typeof checkin?.completed_at === 'string' ? checkin.completed_at : undefined }
+        : undefined
       return {
         id: workoutId,
         date: String(workout.workout_date),
@@ -155,6 +162,7 @@ async function loadPlan(supabase: Awaited<ReturnType<typeof import('@/lib/supaba
         steps: workoutSteps,
         status: state,
         optional: Boolean(workout.is_optional),
+        feedback,
       }
     })
     return {
