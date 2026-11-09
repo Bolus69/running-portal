@@ -59,7 +59,7 @@ export function ResetPasswordForm({ url, publishableKey }: { url: string; publis
 
   async function setNewPassword(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (password.length < 10) return setErrorMessage('Kies een wachtwoord van minimaal 10 tekens.')
+    if (password.length < 6) return setErrorMessage('Kies een wachtwoord van minimaal 6 tekens.')
     if (password !== confirmation) return setErrorMessage('De wachtwoorden komen niet overeen.')
 
     const supabase = createBrowserClient(url, publishableKey)
@@ -75,10 +75,10 @@ export function ResetPasswordForm({ url, publishableKey }: { url: string; publis
 
   return <form className="login-form" onSubmit={setNewPassword}>
     {email && <p className="invite-email">Wachtwoord aanpassen voor <strong>{email}</strong></p>}
-    <label className="field"><span>Nieuw wachtwoord</span><input required type="password" minLength={10} autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
-    <label className="field"><span>Herhaal wachtwoord</span><input required type="password" minLength={10} autoComplete="new-password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} /></label>
+    <label className="field"><span>Nieuw wachtwoord</span><input required type="password" minLength={6} autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
+    <label className="field"><span>Herhaal wachtwoord</span><input required type="password" minLength={6} autoComplete="new-password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} /></label>
     {errorMessage && <p className="login-error" role="alert">{errorMessage}</p>}
     <button className="button button-primary full-width">Wachtwoord opslaan</button>
-    <p className="login-help">Gebruik minimaal 10 tekens.</p>
+    <p className="login-help">Gebruik minimaal 6 tekens.</p>
   </form>
 }

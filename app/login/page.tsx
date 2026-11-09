@@ -2,9 +2,11 @@ import Link from 'next/link'
 import { signIn } from './actions'
 import { LogoMark } from '@/components/logo'
 import { isSupabaseConfigured } from '@/lib/supabase/env'
+import { ForgotPasswordLink } from '@/components/forgot-password-link'
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const { error } = await searchParams
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string; email?: string }> }) {
+  const { error, email } = await searchParams
+  const initialEmail = typeof email === 'string' ? email.slice(0, 254) : ''
   return (
     <main className="login-page">
       <section className="login-card">
@@ -21,10 +23,10 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         ) : (
           <>
             <form action={signIn} className="login-form">
-              <label className="field"><span>E-mailadres</span><input required type="email" name="email" autoComplete="email" /></label>
+              <label className="field"><span>E-mailadres</span><input required type="email" name="email" autoComplete="email" defaultValue={initialEmail} /></label>
               <label className="field"><span>Wachtwoord</span><input required type="password" name="password" autoComplete="current-password" /></label>
-              <Link className="login-reset-link" href="/forgot-password">Wachtwoord vergeten?</Link>
-              {error && <p className="login-error" role="alert">{decodeURIComponent(error)}</p>}
+              <ForgotPasswordLink />
+              {error && <p className="login-error" role="alert">{error}</p>}
               <button className="button button-primary full-width">Inloggen</button>
               <p className="login-help">Nog geen account? Vraag je coach om een uitnodiging.</p>
             </form>

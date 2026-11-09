@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
@@ -41,7 +42,7 @@ export function AcceptInviteForm({ url, publishableKey }: { url: string; publish
         if (!cancelled && data.user) setEmail(data.user.email ?? '')
       }
       if (!cancelled) {
-        setErrorMessage(authError?.message ?? '')
+        setErrorMessage(authError ? 'Deze link is verlopen of ongeldig. Vraag een nieuwe herstel-link aan of vraag je coach om een nieuwe uitnodiging.' : '')
         setState(authError ? 'invalid' : 'ready')
       }
     }
@@ -56,7 +57,7 @@ export function AcceptInviteForm({ url, publishableKey }: { url: string; publish
 
   async function setNewPassword(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (password.length < 10) return setErrorMessage('Kies een wachtwoord van minimaal 10 tekens.')
+    if (password.length < 6) return setErrorMessage('Kies een wachtwoord van minimaal 6 tekens.')
     if (password !== confirmation) return setErrorMessage('De wachtwoorden komen niet overeen.')
     const supabase = createBrowserClient(url, publishableKey)
     const { error } = await supabase.auth.updateUser({ password })
@@ -66,16 +67,16 @@ export function AcceptInviteForm({ url, publishableKey }: { url: string; publish
     router.replace('/')
   }
 
-  if (state === 'checking') return <p className="login-help" role="status">Uitnodiging controleren…</p>
-  if (state === 'invalid') return <div className="invite-invalid"><p className="login-error" role="alert">{errorMessage || 'Deze uitnodiging is niet meer geldig.'}</p><p className="login-help">Vraag je coach om een nieuwe uitnodiging en open de link in dezelfde browser.</p></div>
-  if (state === 'saved') return <p className="invite-success" role="status">Je account is klaar. Je wordt doorgestuurd…</p>
+  if (state === 'checking') return <p className="login-help" role="status">Link controleren…</p>
+  if (state === 'invalid') return <div className="invite-invalid"><p className="login-error" role="alert">{errorMessage || 'Deze link is verlopen of ongeldig.'}</p><Link className="button button-primary full-width" href="/forgot-password">Nieuwe herstel-link aanvragen</Link><p className="login-help">Gaat het om een uitnodiging? Vraag je coach om een nieuwe link. Open de link in dezelfde browser.</p></div>
+  if (state === 'saved') return <p className="invite-success" role="status">Je wachtwoord is ingesteld. Je wordt doorgestuurd…</p>
 
   return <form className="login-form" onSubmit={setNewPassword}>
-    {email && <p className="invite-email">Uitnodiging voor <strong>{email}</strong></p>}
-    <label className="field"><span>Nieuw wachtwoord</span><input required type="password" minLength={10} autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
-    <label className="field"><span>Herhaal wachtwoord</span><input required type="password" minLength={10} autoComplete="new-password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} /></label>
+    {email && <p className="invite-email">Account voor <strong>{email}</strong></p>}
+    <label className="field"><span>Nieuw wachtwoord</span><input required type="password" minLength={6} autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
+    <label className="field"><span>Herhaal wachtwoord</span><input required type="password" minLength={6} autoComplete="new-password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} /></label>
     {errorMessage && <p className="login-error" role="alert">{errorMessage}</p>}
-    <button className="button button-primary full-width">Account activeren</button>
-    <p className="login-help">Gebruik minimaal 10 tekens.</p>
+    <button className="button button-primary full-width">Wachtwoord instellen</button>
+    <p className="login-help">Gebruik minimaal 6 tekens.</p>
   </form>
 }

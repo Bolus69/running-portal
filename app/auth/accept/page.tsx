@@ -9,9 +9,9 @@ export default function AcceptInvitePage() {
     <main className="login-page">
       <section className="login-card">
         <Link href="/" className="login-brand"><LogoMark /><span><strong>Marathon Coach</strong><small>by Maarten</small></span></Link>
-        <p className="eyebrow">JE ACCOUNT ACTIVEREN</p>
-        <h1>Kies je wachtwoord</h1>
-        <p className="login-intro">Rond je uitnodiging af om toegang te krijgen tot jouw trainingsomgeving.</p>
+        <p className="eyebrow">ACCOUNTTOEGANG INSTELLEN</p>
+        <h1>Kies een nieuw wachtwoord</h1>
+        <p className="login-intro">Rond je uitnodiging af of herstel je toegang tot de trainingsomgeving met een nieuw wachtwoord.</p>
         {config ? <AcceptInviteForm url={config.url} publishableKey={config.publishableKey} /> : <p className="login-error" role="alert">De accountomgeving is nog niet ingesteld.</p>}
         <Link className="login-back" href="/login">← Terug naar inloggen</Link>
       </section>
