@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { createBrowserClient } from '@supabase/ssr'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 type ResetState = 'checking' | 'ready' | 'invalid' | 'saved'
 
@@ -12,49 +12,56 @@ export function ResetPasswordForm({ url, publishableKey }: { url: string; publis
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
+  const verification = useRef<Promise<{ email: string; errorMessage: string | null }> | null>(null)
 
   useEffect(() => {
-    let cancelled = false
-    const checkRecoveryLink = async () => {
-      const supabase = createBrowserClient(url, publishableKey)
-      const query = new URLSearchParams(window.location.search)
-      const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''))
-      const accessToken = hash.get('access_token')
-      const refreshToken = hash.get('refresh_token')
-      const code = query.get('code')
-      let authError: Error | null = null
+    if (!verification.current) {
+      verification.current = (async () => {
+        const supabase = createBrowserClient(url, publishableKey, {
+          auth: { detectSessionInUrl: false },
+        })
+        const query = new URLSearchParams(window.location.search)
+        const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+        const accessToken = hash.get('access_token')
+        const refreshToken = hash.get('refresh_token')
+        const code = query.get('code')
+        let authError: Error | null = null
+        let userEmail = ''
 
-      if (query.has('error') || query.has('error_code')) {
-        authError = new Error('De herstel-link is verlopen of ongeldig.')
-      } else if (accessToken && refreshToken) {
-        const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
-        authError = error
-      } else if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code)
-        authError = error
-      }
+        if (query.has('error') || query.has('error_code')) {
+          authError = new Error('De herstel-link is verlopen of ongeldig.')
+        } else if (accessToken && refreshToken) {
+          const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+          authError = error
+        } else if (code) {
+          const { error } = await supabase.auth.exchangeCodeForSession(code)
+          authError = error
+        } else {
+          authError = new Error('De herstel-link bevat geen geldige code.')
+        }
 
-      if (!authError) {
-        const { data, error } = await supabase.auth.getUser()
-        authError = error
-        if (!cancelled && data.user) setEmail(data.user.email ?? '')
-      }
+        window.history.replaceState({}, document.title, window.location.pathname)
+        if (!authError) {
+          const { data, error } = await supabase.auth.getUser()
+          authError = error
+          if (data.user) userEmail = data.user.email ?? ''
+        }
 
-      window.history.replaceState({}, document.title, window.location.pathname)
-      if (!cancelled) {
-        setErrorMessage(authError ? 'Deze herstel-link is verlopen of ongeldig. Vraag een nieuwe link aan.' : '')
-        setState(authError ? 'invalid' : 'ready')
-      }
+        return {
+          email: userEmail,
+          errorMessage: authError ? 'Deze herstel-link is verlopen of ongeldig. Vraag een nieuwe link aan.' : null,
+        }
+      })()
     }
 
-    void checkRecoveryLink().catch(() => {
-      if (!cancelled) {
-        setErrorMessage('De herstel-link kon niet worden gecontroleerd. Vraag een nieuwe link aan.')
-        setState('invalid')
-      }
+    void verification.current.then((result) => {
+      setEmail(result.email)
+      setErrorMessage(result.errorMessage ?? '')
+      setState(result.errorMessage ? 'invalid' : 'ready')
+    }).catch(() => {
+      setErrorMessage('De herstel-link kon niet worden gecontroleerd. Vraag een nieuwe link aan.')
+      setState('invalid')
     })
-
-    return () => { cancelled = true }
   }, [publishableKey, url])
 
   async function setNewPassword(event: React.FormEvent<HTMLFormElement>) {
@@ -62,7 +69,9 @@ export function ResetPasswordForm({ url, publishableKey }: { url: string; publis
     if (password.length < 6) return setErrorMessage('Kies een wachtwoord van minimaal 6 tekens.')
     if (password !== confirmation) return setErrorMessage('De wachtwoorden komen niet overeen.')
 
-    const supabase = createBrowserClient(url, publishableKey)
+    const supabase = createBrowserClient(url, publishableKey, {
+      auth: { detectSessionInUrl: false },
+    })
     const { error } = await supabase.auth.updateUser({ password })
     if (error) return setErrorMessage('Het wachtwoord kon niet worden opgeslagen. Probeer het opnieuw.')
     setErrorMessage('')

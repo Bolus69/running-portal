@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 type InviteState = 'checking' | 'ready' | 'invalid' | 'saved'
 
@@ -14,52 +14,67 @@ export function AcceptInviteForm({ url, publishableKey }: { url: string; publish
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
+  const verification = useRef<Promise<{ email: string; errorMessage: string | null }> | null>(null)
 
   useEffect(() => {
-    let cancelled = false
-    const finishInvite = async () => {
-      const supabase = createBrowserClient(url, publishableKey)
-      const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''))
-      const accessToken = hash.get('access_token')
-      const refreshToken = hash.get('refresh_token')
-      const code = new URLSearchParams(window.location.search).get('code')
-      let authError: Error | null = null
+    if (!verification.current) {
+      verification.current = (async () => {
+        const supabase = createBrowserClient(url, publishableKey, {
+          auth: { detectSessionInUrl: false },
+        })
+        const query = new URLSearchParams(window.location.search)
+        const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+        const accessToken = hash.get('access_token')
+        const refreshToken = hash.get('refresh_token')
+        const code = query.get('code')
+        let authError: Error | null = null
+        let userEmail = ''
 
-      if (accessToken && refreshToken) {
-        const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
-        authError = error
-      } else if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code)
-        authError = error
-      } else if (new URLSearchParams(window.location.search).has('error')) {
-        authError = new Error('De uitnodigingslink is verlopen of ongeldig.')
-      }
+        if (query.has('error') || query.has('error_code')) {
+          authError = new Error('De uitnodigingslink is verlopen of ongeldig.')
+        } else if (accessToken && refreshToken) {
+          const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+          authError = error
+        } else if (code) {
+          const { error } = await supabase.auth.exchangeCodeForSession(code)
+          authError = error
+        } else {
+          authError = new Error('De link bevat geen geldige herstelcode.')
+        }
 
-      window.history.replaceState({}, document.title, window.location.pathname)
-      if (!authError) {
-        const { data, error } = await supabase.auth.getUser()
-        authError = error
-        if (!cancelled && data.user) setEmail(data.user.email ?? '')
-      }
-      if (!cancelled) {
-        setErrorMessage(authError ? 'Deze link is verlopen of ongeldig. Vraag een nieuwe herstel-link aan of vraag je coach om een nieuwe uitnodiging.' : '')
-        setState(authError ? 'invalid' : 'ready')
-      }
+        window.history.replaceState({}, document.title, window.location.pathname)
+        if (!authError) {
+          const { data, error } = await supabase.auth.getUser()
+          authError = error
+          if (data.user) userEmail = data.user.email ?? ''
+        }
+
+        return {
+          email: userEmail,
+          errorMessage: authError
+            ? 'Deze link is verlopen of ongeldig. Vraag een nieuwe herstel-link aan. Gaat het om een uitnodiging? Vraag je coach om een nieuwe link.'
+            : null,
+        }
+      })()
     }
-    void finishInvite().catch(() => {
-      if (!cancelled) {
-        setErrorMessage('De uitnodiging kon niet worden gecontroleerd. Vraag je coach om een nieuwe link.')
-        setState('invalid')
-      }
+
+    void verification.current.then((result) => {
+      setEmail(result.email)
+      setErrorMessage(result.errorMessage ?? '')
+      setState(result.errorMessage ? 'invalid' : 'ready')
+    }).catch(() => {
+      setErrorMessage('De link kon niet worden gecontroleerd. Vraag een nieuwe herstel-link aan of vraag je coach om een nieuwe uitnodiging.')
+      setState('invalid')
     })
-    return () => { cancelled = true }
   }, [publishableKey, url])
 
   async function setNewPassword(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (password.length < 6) return setErrorMessage('Kies een wachtwoord van minimaal 6 tekens.')
     if (password !== confirmation) return setErrorMessage('De wachtwoorden komen niet overeen.')
-    const supabase = createBrowserClient(url, publishableKey)
+    const supabase = createBrowserClient(url, publishableKey, {
+      auth: { detectSessionInUrl: false },
+    })
     const { error } = await supabase.auth.updateUser({ password })
     if (error) return setErrorMessage('Het wachtwoord kon niet worden opgeslagen. Probeer het opnieuw.')
     setState('saved')
