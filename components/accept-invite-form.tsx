@@ -2,19 +2,18 @@
 
 import Link from 'next/link'
 import { createBrowserClient } from '@supabase/ssr'
-import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 
 type InviteState = 'checking' | 'ready' | 'invalid' | 'saved'
 
 export function AcceptInviteForm({ url, publishableKey }: { url: string; publishableKey: string }) {
-  const router = useRouter()
   const [state, setState] = useState<InviteState>('checking')
   const [email, setEmail] = useState('')
+  const [inviteUserId, setInviteUserId] = useState('')
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
-  const verification = useRef<Promise<{ email: string; errorMessage: string | null }> | null>(null)
+  const verification = useRef<Promise<{ email: string; userId: string; errorMessage: string | null }> | null>(null)
 
   useEffect(() => {
     if (!verification.current) {
@@ -27,8 +26,10 @@ export function AcceptInviteForm({ url, publishableKey }: { url: string; publish
         const accessToken = hash.get('access_token')
         const refreshToken = hash.get('refresh_token')
         const code = query.get('code')
+        const tokenHash = query.get('token_hash')
         let authError: Error | null = null
         let userEmail = ''
+        let userId = ''
 
         if (query.has('error') || query.has('error_code')) {
           authError = new Error('De uitnodigingslink is verlopen of ongeldig.')
@@ -38,21 +39,30 @@ export function AcceptInviteForm({ url, publishableKey }: { url: string; publish
         } else if (code) {
           const { error } = await supabase.auth.exchangeCodeForSession(code)
           authError = error
+        } else if (tokenHash) {
+          const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'invite' })
+          authError = error
         } else {
-          authError = new Error('De link bevat geen geldige herstelcode.')
+          // A coach may already be signed in in this browser. That session must
+          // never count as proof that this invitation was opened.
+          authError = new Error('Open de persoonlijke uitnodigingslink om je account te activeren.')
         }
 
         window.history.replaceState({}, document.title, window.location.pathname)
         if (!authError) {
           const { data, error } = await supabase.auth.getUser()
-          authError = error
-          if (data.user) userEmail = data.user.email ?? ''
+          authError = error ?? (!data.user ? new Error('De uitnodiging kon niet worden gecontroleerd.') : null)
+          if (!authError && data.user) {
+            userEmail = data.user.email ?? ''
+            userId = data.user.id
+          }
         }
 
         return {
           email: userEmail,
+          userId,
           errorMessage: authError
-            ? 'Deze link is verlopen of ongeldig. Vraag een nieuwe herstel-link aan. Gaat het om een uitnodiging? Vraag je coach om een nieuwe link.'
+            ? 'Deze uitnodigingslink is verlopen of ongeldig. Vraag je coach om een nieuwe link.'
             : null,
         }
       })()
@@ -60,6 +70,7 @@ export function AcceptInviteForm({ url, publishableKey }: { url: string; publish
 
     void verification.current.then((result) => {
       setEmail(result.email)
+      setInviteUserId(result.userId)
       setErrorMessage(result.errorMessage ?? '')
       setState(result.errorMessage ? 'invalid' : 'ready')
     }).catch(() => {
@@ -75,15 +86,23 @@ export function AcceptInviteForm({ url, publishableKey }: { url: string; publish
     const supabase = createBrowserClient(url, publishableKey, {
       auth: { detectSessionInUrl: false },
     })
+    const { data: currentUser, error: sessionError } = await supabase.auth.getUser()
+    if (sessionError || !currentUser.user || currentUser.user.id !== inviteUserId) {
+      setErrorMessage('De uitnodigingssessie is verlopen. Vraag je coach om een nieuwe uitnodigingslink.')
+      setState('invalid')
+      return
+    }
     const { error } = await supabase.auth.updateUser({ password })
     if (error) return setErrorMessage('Het wachtwoord kon niet worden opgeslagen. Probeer het opnieuw.')
     setState('saved')
     setErrorMessage('')
-    router.replace('/')
+    // A full page load clears any cached dashboard for another account in the
+    // same browser and loads the newly activated athlete's own profile.
+    window.location.replace('/')
   }
 
   if (state === 'checking') return <p className="login-help" role="status">Link controleren…</p>
-  if (state === 'invalid') return <div className="invite-invalid"><p className="login-error" role="alert">{errorMessage || 'Deze link is verlopen of ongeldig.'}</p><Link className="button button-primary full-width" href="/forgot-password">Nieuwe herstel-link aanvragen</Link><p className="login-help">Gaat het om een uitnodiging? Vraag je coach om een nieuwe link. Open de link in dezelfde browser.</p></div>
+  if (state === 'invalid') return <div className="invite-invalid"><p className="login-error" role="alert">{errorMessage || 'Deze uitnodiging is verlopen of ongeldig.'}</p><p className="login-help">Vraag je coach om een nieuwe uitnodiging en open de link in dezelfde browser.</p><Link className="button button-outline full-width" href="/login">Naar inloggen</Link></div>
   if (state === 'saved') return <p className="invite-success" role="status">Je wachtwoord is ingesteld. Je wordt doorgestuurd…</p>
 
   return <form className="login-form" onSubmit={setNewPassword}>

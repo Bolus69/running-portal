@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { LogoMark } from '@/components/logo'
 import { ForgotPasswordForm } from '@/components/forgot-password-form'
-import { isSupabaseConfigured, getSupabasePublicConfig } from '@/lib/supabase/env'
+import { getSupabasePublicConfig } from '@/lib/supabase/env'
 
 const resetErrors: Record<string, string> = {
   invalid: 'Controleer het e-mailadres en probeer het opnieuw.',
