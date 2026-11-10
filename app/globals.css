@@ -369,6 +369,13 @@ body { font-size: 15px; line-height: 1.6; }
 .profile-footnote { color: #526477; font-size: 11px; line-height: 1.55; }
 .next-card .muted { color: #58697B; font-size: 12px; line-height: 1.6; }
 .stat-copy > span { color: #667789; }
+.source-upload { color: #4e7139; background: #eff6df; }
+.linked-activity-summary { display: grid; gap: 4px; margin-top: 9px; padding: 10px 12px; border: 1px solid #e1ead4; border-radius: 8px; background: #f7faef; color: #65735f; font-size: 9px; }
+.linked-activity-summary strong { color: #496238; font-size: 10px; }
+.linked-activity-summary small { color: #899584; font-size: 8px; }
+.activity-upload-note { color: #7d897b; font-size: 9px; line-height: 1.5; }
+.activity-upload-selected { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #496238; font-size: 10px; }
+.activity-upload-error { padding: 9px 11px; color: #9e5240; background: #fff2ef; border: 1px solid #f1d3cc; border-radius: 8px; font-size: 10px; line-height: 1.45; }
 @media (max-width: 620px) {
   body { font-size: 14px; }
   .page-subtitle { font-size: 12px; }

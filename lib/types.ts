@@ -20,7 +20,7 @@ export type RunActivity = {
   distanceKm?: number
   pace?: string
   averageHeartRate?: number
-  source: 'strava' | 'manual'
+  source: 'strava' | 'manual' | 'upload'
   plannedWorkoutId?: string
   note?: string
   effort?: 'easier' | 'as_expected' | 'harder' | 'not_good'

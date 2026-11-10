@@ -64,7 +64,7 @@ function mapActivities(activityRows: Row[], lapRows: Row[], linkRows: Row[]): Ru
       distanceKm: distance !== undefined ? Math.round((distance / 1000) * 100) / 100 : undefined,
       pace: speed && speed > 0 ? formatPace(1000 / speed) : undefined,
       averageHeartRate: numberValue(row.average_heart_rate),
-      source: row.source === 'strava' ? 'strava' as const : 'manual' as const,
+      source: row.source === 'strava' ? 'strava' as const : raw.import_source === 'fit' ? 'upload' as const : 'manual' as const,
       plannedWorkoutId: linkByActivity.get(id),
       note: typeof raw.note === 'string' ? raw.note : undefined,
       effort: effortName(raw.effort),
