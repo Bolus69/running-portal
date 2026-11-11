@@ -74,7 +74,7 @@ function mapActivities(activityRows: Row[], lapRows: Row[], linkRows: Row[]): Ru
         return {
           id: String(lap.id),
           label: String(lap.label || 'Lap ' + (index + 1)),
-          durationMinutes: numberValue(lap.elapsed_seconds) ? Math.round(Number(lap.elapsed_seconds) / 60) : undefined,
+          durationMinutes: numberValue(lap.elapsed_seconds) ? Number(lap.elapsed_seconds) / 60 : undefined,
           distanceKm: lapDistance !== undefined ? Math.round((lapDistance / 1000) * 100) / 100 : undefined,
           pace: lapSpeed && lapSpeed > 0 ? formatPace(1000 / lapSpeed) : undefined,
           averageHeartRate: numberValue(lap.average_heart_rate),

@@ -687,7 +687,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
               </section>
 
               <div className="content-grid week-grid">
-                <section className="section-main"><div className="section-heading"><div><p className="eyebrow">JOUW PLANNING</p><h2>Deze week</h2></div><button className="text-button" onClick={() => go('plan')}>Hele schema <Icon name="arrow" size={16} /></button></div><div className="workout-list">{activeWeek.workouts.map((workout) => <WorkoutCard key={workout.id} workout={workout} expanded={expandedWorkout === workout.id} onExpand={() => setExpandedWorkout(expandedWorkout === workout.id ? null : workout.id)} onDone={() => openWorkoutFeedback(workout)} onSkip={() => updateWorkout(workout.id, 'skipped')} />)}</div></section>
+                <section className="section-main"><div className="section-heading"><div><p className="eyebrow">JOUW PLANNING</p><h2>Deze week</h2></div><button className="text-button" onClick={() => go('plan')}>Hele schema <Icon name="arrow" size={16} /></button></div><div className="workout-list">{activeWeek.workouts.map((workout) => <WorkoutCard key={workout.id} workout={workout} activity={data.activities.find((activity) => activity.plannedWorkoutId === workout.id)} expanded={expandedWorkout === workout.id} onExpand={() => setExpandedWorkout(expandedWorkout === workout.id ? null : workout.id)} onDone={() => openWorkoutFeedback(workout)} onSkip={() => updateWorkout(workout.id, 'skipped')} />)}</div></section>
                 <aside className="section-aside"><div className="next-card"><div className="aside-card-head"><span className="aside-icon lime"><Icon name="spark" size={17} /></span><span className="small-label">VOLGENDE TRAINING</span></div>{nextTraining ? <><p className="next-date">{dateLabel(nextTraining.date)}</p><h3>{nextTraining.title}</h3><p className="muted">{nextTraining.description}</p><div className="next-details"><span>{nextTraining.durationMinutes ? nextTraining.durationMinutes + ' min' : nextTraining.distanceKm + ' km'}</span><span>{nextTraining.intensity}</span></div><button className="button button-dark full-width" onClick={() => { setExpandedWorkout(nextTraining.id); window.scrollTo({ top: 550, behavior: 'smooth' }) }}>Training bekijken <Icon name="arrow" size={16} /></button></> : <div className="empty-small"><strong>Alles gedaan</strong><span>Je trainingen voor deze week zijn afgerond.</span></div>}</div>
                   <div className="pace-card"><div className="aside-card-head"><span className="aside-icon light"><Icon name="run" size={17} /></span><span className="small-label">TRAININGSINTENSITEIT</span></div><p>Gebruik tempo als richtlijn. Je gevoel en de omstandigheden tellen mee.</p><PaceStrip /><button className="text-button" onClick={() => go('profile')}>Mijn tempozones <Icon name="arrow" size={16} /></button></div>
                   <div className="wellness-nudge"><span className="wellness-nudge-icon"><Icon name="heart" /></span><div><strong>Hoe is je herstel?</strong><span>Alleen als je wilt delen.</span></div><button aria-label="Herstel invullen" onClick={() => go('wellness')}><Icon name="arrow" size={17} /></button></div>
@@ -738,7 +738,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
   )
 }
 
-function WorkoutCard({ workout, expanded, onExpand, onDone, onSkip }: { workout: PlanWeek['workouts'][number]; expanded: boolean; onExpand: () => void; onDone: () => void; onSkip: () => void }) {
+function WorkoutCard({ workout, activity, expanded, onExpand, onDone, onSkip }: { workout: PlanWeek['workouts'][number]; activity?: RunActivity; expanded: boolean; onExpand: () => void; onDone: () => void; onSkip: () => void }) {
   const icon = workout.type === 'long' || workout.type === 'race' ? 'run' : workout.type === 'quality' ? 'spark' : 'clock'
   const canAddFeedback = workout.status === 'completed'
   return (
@@ -749,6 +749,7 @@ function WorkoutCard({ workout, expanded, onExpand, onDone, onSkip }: { workout:
         <p className="workout-description">{workout.goal}</p>
         <div className="workout-meta"><span><Icon name="clock" size={14} />{workout.durationMinutes ? workout.durationMinutes + ' min' : workout.distanceKm + ' km'}{workout.timeCapMinutes ? ' · max. ' + workout.timeCapMinutes + ' min' : ''}</span><span className="meta-divider" /><span>{workout.intensity}</span></div>
         {workout.feedback && <div className="workout-feedback-inline"><strong>Jouw terugkoppeling</strong>{workout.feedback.effort && <span>{effortLabel(workout.feedback.effort)}</span>}{workout.feedback.note && <p>{workout.feedback.note}</p>}</div>}
+        {activity && <LinkedActivitySummary activity={activity} />}
         {expanded && <div className="workout-detail">
           <p>{workout.description}</p>
           <div className="step-list">{workout.steps.map((step, idx) => <div className="step-row" key={idx}><span className="step-index">{String(idx + 1).padStart(2, '0')}</span><span>{step.label}{step.repeats ? ' · ' + step.repeats + '×' : ''}</span><b>{step.durationSeconds ? step.durationSeconds + ' sec' : step.durationMinutes ? step.durationMinutes + ' min' : ''}{step.intensity ? ' · ' + step.intensity : ''}{step.all4runningZone ? <small className="zone-chip">Z{step.all4runningZone === '4-5' ? '4–5' : step.all4runningZone}</small> : null}</b></div>)}</div>
@@ -790,12 +791,15 @@ function PlanView({ plan, activities, onWorkout, expandedWorkout }: { plan: Dash
             <div className="plan-week-workouts">
               {week.workouts.map((workout) => {
                 const linkedActivity = activities.find((activity) => activity.plannedWorkoutId === workout.id)
-                return <div className="plan-row" key={workout.id}>
-                  <div><span className="plan-row-date">{dateLabel(workout.date)}</span><strong>{workout.title}{workout.optional && <small className="optional-tag">Optioneel</small>}</strong></div>
-                  <span className="plan-row-duration">{workout.durationMinutes ? workout.durationMinutes + ' min' : workout.distanceKm + ' km'}</span>
-                  <StatusPill status={workout.status} />
-                  <button className="icon-quiet" aria-label="Trainingdetails tonen" onClick={() => onWorkout(expandedWorkout === workout.id ? null : workout.id)}><Icon name="arrow" size={16} /></button>
-                  {expandedWorkout === workout.id && <div className="plan-row-detail">{workout.description}<div>{workout.steps.map((step, index) => <span key={index}>{step.label}{step.repeats ? ' · ' + step.repeats + '×' : ''}{step.durationMinutes ? ' · ' + step.durationMinutes + ' min' : ''}</span>)}</div>{linkedActivity && <LinkedActivitySummary activity={linkedActivity} />}</div>}
+                return <div className="plan-workout-entry" key={workout.id}>
+                  <div className="plan-row">
+                    <div><span className="plan-row-date">{dateLabel(workout.date)}</span><strong>{workout.title}{workout.optional && <small className="optional-tag">Optioneel</small>}</strong></div>
+                    <span className="plan-row-duration">{workout.durationMinutes ? workout.durationMinutes + ' min' : workout.distanceKm + ' km'}</span>
+                    <StatusPill status={workout.status} />
+                    <button className="icon-quiet" aria-label="Trainingdetails tonen" onClick={() => onWorkout(expandedWorkout === workout.id ? null : workout.id)}><Icon name="arrow" size={16} /></button>
+                  </div>
+                  {expandedWorkout === workout.id && <div className="plan-row-detail"><p>{workout.description}</p><div>{workout.steps.map((step, index) => <span key={index}>{step.label}{step.repeats ? ' · ' + step.repeats + '×' : ''}{step.durationMinutes ? ' · ' + step.durationMinutes + ' min' : ''}</span>)}</div></div>}
+                  {linkedActivity && <LinkedActivitySummary activity={linkedActivity} />}
                 </div>
               })}
             </div>
@@ -809,17 +813,27 @@ function PlanView({ plan, activities, onWorkout, expandedWorkout }: { plan: Dash
 
 function LinkedActivitySummary({ activity }: { activity: RunActivity }) {
   const details = [
+    dateLabel(activity.startedAt),
     activity.distanceKm ? activity.distanceKm.toFixed(1).replace('.', ',') + ' km' : undefined,
     activity.durationMinutes + ' min',
     activity.pace ? activity.pace + ' /km' : undefined,
     activity.averageHeartRate ? Math.round(activity.averageHeartRate) + ' bpm gemiddeld' : undefined,
   ].filter(Boolean).join(' · ')
-  return <div className="linked-activity-summary"><strong>Uitgevoerde activiteit · {activitySourceLabel(activity.source)}</strong><span>{details}</span>{activity.laps?.length ? <small>{activity.laps.length} blokken uit het bestand</small> : null}</div>
+  return <div className="linked-activity-summary"><strong>Uitgevoerde activiteit · {activitySourceLabel(activity.source)}</strong><span>{details}</span>{activity.laps?.length ? <ActivityLapDetails laps={activity.laps} /> : null}</div>
+}
+
+function formatLapDuration(minutes: number): string {
+  const seconds = Math.round(minutes * 60)
+  return Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0')
+}
+
+function ActivityLapDetails({ laps }: { laps: NonNullable<RunActivity['laps']> }) {
+  return <details className="lap-details linked-activity-laps"><summary>Bekijk {laps.length} rondes of blokken</summary><div className="lap-table linked-lap-table"><div className="linked-lap-heading"><span>Ronde/blok</span><span>Duur</span><span>Afstand</span><span>Tempo</span><span>Hartslag</span></div>{laps.map((lap) => <div key={lap.id}><span>{lap.label}</span><span>{lap.durationMinutes ? formatLapDuration(lap.durationMinutes) : '—'}</span><span>{lap.distanceKm ? lap.distanceKm.toFixed(2).replace('.', ',') + ' km' : '—'}</span><span>{lap.pace ? lap.pace + ' /km' : '—'}</span><span>{lap.averageHeartRate ? Math.round(lap.averageHeartRate) + ' bpm' : '—'}</span></div>)}</div></details>
 }
 
 function HistoryView({ activities, onAdd }: { activities: RunActivity[]; onAdd: () => void }) {
   const items = [...activities].sort((a, b) => b.startedAt.localeCompare(a.startedAt))
-  return <section className="history-page"><div className="history-toolbar"><div className="filter-chip active">Laatste 30 dagen</div><button className="button button-outline button-small" onClick={onAdd}><Icon name="plus" size={15} /> Handmatig toevoegen</button></div>{items.length ? <div className="history-list">{items.map((activity) => <article className="history-card" key={activity.id}><div className="history-date"><strong>{dateLabel(activity.startedAt, { day: 'numeric' })}</strong><span>{dateLabel(activity.startedAt, { month: 'short' })}</span></div><div className="history-activity-icon"><Icon name="run" size={18} /></div><div className="history-main"><div className="history-title-row"><h3>{activity.name}</h3><span className={'source-pill source-' + activity.source}>{activity.source === 'strava' ? <><Icon name="link" size={13} /> Strava</> : activitySourceLabel(activity.source)}</span></div><div className="history-meta"><span>{activity.distanceKm ? activity.distanceKm.toFixed(1).replace('.', ',') + ' km' : 'Afstand niet ingevuld'}</span><span>{activity.durationMinutes} min</span>{activity.pace && <span>{activity.pace} /km</span>}{activity.averageHeartRate && <span>{activity.averageHeartRate} bpm gem.</span>}</div>{activity.effort && <p className="history-feedback"><span>Gevoel</span>{effortLabel(activity.effort)}</p>}{activity.note && <p className="history-note">{activity.note}</p>}{activity.laps && activity.laps.length > 0 && <details className="lap-details"><summary>{activity.laps.length} laps / blokken met gegevens</summary><div className="lap-table">{activity.laps.map((lap) => <div key={lap.id}><span>{lap.label}</span><span>{lap.durationMinutes ? lap.durationMinutes + ' min' : '—'}</span><span>{lap.pace ? lap.pace + ' /km' : '—'}</span><span>{lap.averageHeartRate ? lap.averageHeartRate + ' bpm' : '—'}</span></div>)}</div></details>}</div><span className={'history-link-status ' + (activity.plannedWorkoutId ? 'linked' : 'unlinked')}>{activity.plannedWorkoutId ? 'Gekoppeld' : 'Losse activiteit'}</span></article>)}</div> : <div className="empty-state"><div className="empty-plan-mark"><Icon name="history" size={24} /></div><h3>Nog geen trainingen</h3><p>Voeg na je training kort de belangrijkste gegevens toe.</p><button className="button button-primary button-small" onClick={onAdd}><Icon name="plus" size={15} /> Training toevoegen</button></div>}</section>
+  return <section className="history-page"><div className="history-toolbar"><div className="filter-chip active">Laatste 30 dagen</div><button className="button button-outline button-small" onClick={onAdd}><Icon name="plus" size={15} /> Handmatig toevoegen</button></div>{items.length ? <div className="history-list">{items.map((activity) => <article className="history-card" key={activity.id}><div className="history-date"><strong>{dateLabel(activity.startedAt, { day: 'numeric' })}</strong><span>{dateLabel(activity.startedAt, { month: 'short' })}</span></div><div className="history-activity-icon"><Icon name="run" size={18} /></div><div className="history-main"><div className="history-title-row"><h3>{activity.name}</h3><span className={'source-pill source-' + activity.source}>{activity.source === 'strava' ? <><Icon name="link" size={13} /> Strava</> : activitySourceLabel(activity.source)}</span></div><div className="history-meta"><span>{activity.distanceKm ? activity.distanceKm.toFixed(1).replace('.', ',') + ' km' : 'Afstand niet ingevuld'}</span><span>{activity.durationMinutes} min</span>{activity.pace && <span>{activity.pace} /km</span>}{activity.averageHeartRate && <span>{activity.averageHeartRate} bpm gem.</span>}</div>{activity.effort && <p className="history-feedback"><span>Gevoel</span>{effortLabel(activity.effort)}</p>}{activity.note && <p className="history-note">{activity.note}</p>}{activity.laps && activity.laps.length > 0 && <ActivityLapDetails laps={activity.laps} />}</div><span className={'history-link-status ' + (activity.plannedWorkoutId ? 'linked' : 'unlinked')}>{activity.plannedWorkoutId ? 'Gekoppeld' : 'Losse activiteit'}</span></article>)}</div> : <div className="empty-state"><div className="empty-plan-mark"><Icon name="history" size={24} /></div><h3>Nog geen trainingen</h3><p>Voeg na je training kort de belangrijkste gegevens toe.</p><button className="button button-primary button-small" onClick={onAdd}><Icon name="plus" size={15} /> Training toevoegen</button></div>}</section>
 }
 
 function TrainingDaysControl({ draft, setDraft }: { draft: ProfileDraft; setDraft: React.Dispatch<React.SetStateAction<ProfileDraft>> }) {

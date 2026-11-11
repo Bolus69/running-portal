@@ -213,7 +213,8 @@ h1, h2, h3 { font-family: 'Manrope', 'DM Sans', sans-serif; letter-spacing: -.6p
 .plan-row { display: flex; align-items: center; gap: 13px; padding: 11px 2px; border-bottom: 1px solid #f0f2ee; }.plan-row:last-child { border-bottom: 0; }
 .plan-row > div:first-child { display: flex; flex-direction: column; min-width: 175px; flex: 1; }.plan-row strong { font-size: 10px; }.plan-row-date { color: #929b93; font-size: 8px; margin-bottom: 3px; }.plan-row-duration { color: #6c786e; font-size: 9px; white-space: nowrap; }.plan-row .status-pill { margin-left: 0; }.plan-row .icon-quiet { color: #829081; }
 .plan-row .optional-tag { margin-left: 6px; vertical-align: middle; }
-.plan-row-detail { padding: 0 0 10px 42px; color: #6e7b70; font-size: 9px; }.plan-row-detail div { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 7px; color: #879187; }
+.plan-workout-entry { padding: 11px 2px; border-bottom: 1px solid #f0f2ee; }.plan-workout-entry:last-child { border-bottom: 0; }.plan-workout-entry .plan-row { padding: 0; border: 0; }
+.plan-row-detail { padding: 8px 0 0 42px; color: #6e7b70; font-size: 9px; }.plan-row-detail > p { margin: 0; }.plan-row-detail div { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 7px; color: #879187; }
 .plan-disclaimer { display: flex; align-items: flex-start; gap: 8px; margin: 15px 0 0; color: #768274; font-size: 9px; }.plan-disclaimer svg { color: #96aa7b; flex: 0 0 auto; }
 .empty-plan { max-width: 560px; margin: 65px auto 0; padding: 50px 35px; text-align: center; border: 1px dashed #d5ddd0; border-radius: 18px; background: #fff; }.empty-plan-mark { width: 55px; height: 55px; display: grid; place-items: center; margin: 0 auto 18px; background: var(--lime-soft); color: #536f3d; border-radius: 16px; }.empty-plan h2 { margin: 0 0 9px; font-size: 23px; }.empty-plan > p:not(.eyebrow) { color: #7e897f; font-size: 12px; margin: 0 auto 20px; max-width: 380px; }
 
@@ -373,6 +374,7 @@ body { font-size: 15px; line-height: 1.6; }
 .linked-activity-summary { display: grid; gap: 4px; margin-top: 9px; padding: 10px 12px; border: 1px solid #e1ead4; border-radius: 8px; background: #f7faef; color: #65735f; font-size: 9px; }
 .linked-activity-summary strong { color: #496238; font-size: 10px; }
 .linked-activity-summary small { color: #899584; font-size: 8px; }
+.linked-activity-laps { overflow: hidden; }.linked-lap-table { overflow-x: auto; padding-bottom: 2px; }.linked-lap-table > div { min-width: 405px; grid-template-columns: minmax(70px, 1.2fr) repeat(4, minmax(55px, 1fr)); gap: 8px; }.linked-lap-heading { color: #73806d !important; font-size: 8px !important; font-weight: 700; }
 .activity-upload-note { color: #7d897b; font-size: 9px; line-height: 1.5; }
 .activity-upload-selected { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #496238; font-size: 10px; }
 .activity-upload-error { padding: 9px 11px; color: #9e5240; background: #fff2ef; border: 1px solid #f1d3cc; border-radius: 8px; font-size: 10px; line-height: 1.45; }
