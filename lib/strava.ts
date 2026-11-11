@@ -395,32 +395,35 @@ export async function getStravaActivityCandidates(admin: AdminClient, athleteId:
   })
 }
 
-async function linkActivityToWorkout(admin: AdminClient, athleteId: string, activityId: string, plannedWorkoutId: string) {
+async function linkActivityToWorkout(admin: AdminClient, athleteId: string, activityId: string, plannedWorkoutId: string, replaceExistingActivity: boolean) {
   const { data: existingActivityLinks, error: activityLinkError } = await admin.from('activity_workout_links')
     .select('id,planned_workout_id,match_method')
     .eq('activity_id', activityId)
   if (activityLinkError) throw new Error('De bestaande activiteitskoppeling kon niet worden gecontroleerd.')
   const activityLinks = (existingActivityLinks ?? []) as Array<{ id: string; planned_workout_id: string; match_method: string }>
-  if (activityLinks.some((link) => link.planned_workout_id === plannedWorkoutId)) {
-    await admin.from('workout_feedback').update({ activity_id: activityId, updated_at: new Date().toISOString() })
+  const alreadyLinkedToTarget = activityLinks.some((link) => link.planned_workout_id === plannedWorkoutId)
+  if (alreadyLinkedToTarget && !replaceExistingActivity) {
+    const { error } = await admin.from('workout_feedback').update({ activity_id: activityId, updated_at: new Date().toISOString() })
       .eq('planned_workout_id', plannedWorkoutId).eq('athlete_id', athleteId)
+    if (error) throw new Error('De activiteit is gekoppeld, maar de feedbackkoppeling kon niet worden bijgewerkt.')
     return
   }
-  if (activityLinks.some((link) => link.match_method !== 'date_match')) throw new Error('Deze Strava-activiteit is al aan een andere training gekoppeld.')
+  if (activityLinks.some((link) => link.planned_workout_id !== plannedWorkoutId && link.match_method !== 'date_match')) throw new Error('Deze Strava-activiteit is al aan een andere training gekoppeld.')
 
   const { data: targetLinks, error: targetLinkError } = await admin.from('activity_workout_links')
     .select('id,activity_id,match_method')
     .eq('planned_workout_id', plannedWorkoutId)
   if (targetLinkError) throw new Error('De bestaande trainingskoppeling kon niet worden gecontroleerd.')
   const conflictingTargetLinks = (targetLinks ?? []) as Array<{ id: string; activity_id: string; match_method: string }>
-  if (conflictingTargetLinks.some((link) => link.match_method !== 'date_match')) throw new Error('Er is al een andere activiteit aan deze training gekoppeld.')
+  if (conflictingTargetLinks.some((link) => link.match_method === 'coach')) throw new Error('De coach heeft een activiteit aan deze training gekoppeld. Vraag de coach om de koppeling aan te passen.')
+  if (conflictingTargetLinks.some((link) => link.match_method !== 'date_match') && !replaceExistingActivity) throw new Error('Er is al een andere activiteit aan deze training gekoppeld.')
 
   if (activityLinks.length) {
     const { error } = await admin.from('activity_workout_links').delete().eq('activity_id', activityId).eq('match_method', 'date_match')
     if (error) throw new Error('De bestaande automatische Strava-koppeling kon niet worden aangepast.')
   }
   if (conflictingTargetLinks.length) {
-    const { error } = await admin.from('activity_workout_links').delete().eq('planned_workout_id', plannedWorkoutId).eq('match_method', 'date_match')
+    const { error } = await admin.from('activity_workout_links').delete().eq('planned_workout_id', plannedWorkoutId)
     if (error) throw new Error('De bestaande automatische trainingskoppeling kon niet worden aangepast.')
   }
 
@@ -436,7 +439,7 @@ async function linkActivityToWorkout(admin: AdminClient, athleteId: string, acti
   if (feedbackError) throw new Error('De activiteit is gekoppeld, maar de feedbackkoppeling kon niet worden bijgewerkt.')
 }
 
-async function saveActivity(admin: AdminClient, athleteId: string, activity: StravaSummaryActivity, accessToken: string, allowLapImport: boolean, plannedWorkoutId?: string) {
+async function saveActivity(admin: AdminClient, athleteId: string, activity: StravaSummaryActivity, accessToken: string, allowLapImport: boolean, plannedWorkoutId?: string, replaceExistingActivity = false) {
   if (!activity.id || !isRun(activity)) return null
   const { data: existingActivity, error: existingError } = await admin.from('activities').select('id,athlete_id')
     .eq('source', 'strava').eq('external_activity_id', String(activity.id)).maybeSingle()
@@ -452,19 +455,19 @@ async function saveActivity(admin: AdminClient, athleteId: string, activity: Str
       if (Array.isArray(laps) && laps.length > 0) await storeLaps(admin, activityId, laps)
     }
   }
-  if (plannedWorkoutId) await linkActivityToWorkout(admin, athleteId, activityId, plannedWorkoutId)
+  if (plannedWorkoutId) await linkActivityToWorkout(admin, athleteId, activityId, plannedWorkoutId, replaceExistingActivity)
   else await matchToPlannedWorkout(admin, athleteId, activityId, activity)
   return activityId
 }
 
-export async function attachStravaActivityToWorkout(admin: AdminClient, athleteId: string, plannedWorkoutId: string, workoutDate: string, externalActivityId: string): Promise<void> {
+export async function attachStravaActivityToWorkout(admin: AdminClient, athleteId: string, plannedWorkoutId: string, workoutDate: string, externalActivityId: string, replaceExistingActivity = false): Promise<void> {
   if (!/^\d{1,20}$/.test(externalActivityId)) throw new Error('De gekozen Strava-activiteit is ongeldig.')
   const { token, activities } = await activitiesAroundWorkout(admin, athleteId, workoutDate)
   const candidate = activities.find((activity) => String(activity.id) === externalActivityId)
   if (!candidate || !isDateAroundWorkout(candidate, workoutDate)) throw new Error('De gekozen activiteit is niet meer beschikbaar rond de datum van deze training.')
   const detail = await stravaGet<StravaSummaryActivity>('/activities/' + encodeURIComponent(externalActivityId), token)
   if (!detail || !isRun(detail) || !isDateAroundWorkout(detail, workoutDate)) throw new Error('De gekozen Strava-activiteit past niet bij deze training.')
-  const saved = await saveActivity(admin, athleteId, detail, token, true, plannedWorkoutId)
+  const saved = await saveActivity(admin, athleteId, detail, token, true, plannedWorkoutId, replaceExistingActivity)
   if (!saved) throw new Error('De gekozen Strava-activiteit kon niet worden opgeslagen.')
 }
 

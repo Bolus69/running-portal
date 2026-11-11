@@ -10,9 +10,9 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return jsonError('Log opnieuw in om je Strava-activiteit te koppelen.', 401)
 
-  let body: { plannedWorkoutId?: string; activityId?: string }
+  let body: { plannedWorkoutId?: string; activityId?: string; replaceExistingActivity?: boolean }
   try {
-    body = await request.json() as { plannedWorkoutId?: string; activityId?: string }
+    body = await request.json() as { plannedWorkoutId?: string; activityId?: string; replaceExistingActivity?: boolean }
   } catch {
     return jsonError('Ongeldig verzoek.', 400)
   }
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   if (!workout) return jsonError('Deze training hoort niet bij jouw schema.', 403)
 
   try {
-    await attachStravaActivityToWorkout(createAdminSupabaseClient(), user.id, String(workout.id), String(workout.workout_date), body.activityId)
+    await attachStravaActivityToWorkout(createAdminSupabaseClient(), user.id, String(workout.id), String(workout.workout_date), body.activityId, body.replaceExistingActivity === true)
     return Response.json({ ok: true }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
     const message = error instanceof Error ? error.message : ''
