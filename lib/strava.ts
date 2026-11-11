@@ -44,11 +44,28 @@ type StravaLap = {
 type Row = Record<string, unknown>
 type AdminClient = SupabaseClient
 
+export type StravaLookupErrorCode = 'configuration' | 'not_connected' | 'reconnect' | 'permissions' | 'rate_limit' | 'temporary' | 'server'
+
+export class StravaLookupError extends Error {
+  constructor(public readonly code: StravaLookupErrorCode, public readonly status?: number) {
+    super(code)
+    this.name = 'StravaLookupError'
+  }
+}
+
+function stravaLookupErrorForStatus(status: number): StravaLookupError {
+  if (status === 401) return new StravaLookupError('reconnect', status)
+  if (status === 403) return new StravaLookupError('permissions', status)
+  if (status === 429) return new StravaLookupError('rate_limit', status)
+  if (status >= 500) return new StravaLookupError('temporary', status)
+  return new StravaLookupError('server', status)
+}
+
 function tokenKey(): Buffer {
   const value = process.env.STRAVA_TOKEN_ENCRYPTION_KEY
-  if (!value) throw new Error('Token-encryption key is not configured.')
+  if (!value) throw new StravaLookupError('configuration')
   const key = /^[a-f0-9]{64}$/i.test(value) ? Buffer.from(value, 'hex') : Buffer.from(value, 'base64')
-  if (key.byteLength !== 32) throw new Error('Token-encryption key must contain 32 bytes.')
+  if (key.byteLength !== 32) throw new StravaLookupError('configuration')
   return key
 }
 
@@ -60,11 +77,16 @@ export function encryptStravaToken(value: string): string {
 }
 
 export function decryptStravaToken(value: string): string {
-  const [ivHex, tagHex, ciphertextHex] = value.split(':')
-  if (!ivHex || !tagHex || !ciphertextHex) throw new Error('Encrypted token is invalid.')
-  const decipher = createDecipheriv('aes-256-gcm', tokenKey(), Buffer.from(ivHex, 'hex'))
-  decipher.setAuthTag(Buffer.from(tagHex, 'hex'))
-  return Buffer.concat([decipher.update(Buffer.from(ciphertextHex, 'hex')), decipher.final()]).toString('utf8')
+  try {
+    const [ivHex, tagHex, ciphertextHex] = value.split(':')
+    if (!ivHex || !tagHex || !ciphertextHex) throw new StravaLookupError('reconnect')
+    const decipher = createDecipheriv('aes-256-gcm', tokenKey(), Buffer.from(ivHex, 'hex'))
+    decipher.setAuthTag(Buffer.from(tagHex, 'hex'))
+    return Buffer.concat([decipher.update(Buffer.from(ciphertextHex, 'hex')), decipher.final()]).toString('utf8')
+  } catch (error) {
+    if (error instanceof StravaLookupError) throw error
+    throw new StravaLookupError('reconnect')
+  }
 }
 
 export function stravaOAuthConfigured(): boolean {
@@ -74,7 +96,7 @@ export function stravaOAuthConfigured(): boolean {
 function stravaClientCredentials() {
   const clientId = process.env.STRAVA_CLIENT_ID
   const clientSecret = process.env.STRAVA_CLIENT_SECRET
-  if (!clientId || !clientSecret) throw new Error('Strava OAuth is not configured.')
+  if (!clientId || !clientSecret) throw new StravaLookupError('configuration')
   return { clientId, clientSecret }
 }
 
@@ -225,45 +247,68 @@ export async function ensureStravaWebhookSubscription(callbackOrigin: string): P
   }
   if (!subscription.id) throw new StravaWebhookSetupError('registration_unconfirmed')
 }
-async function refreshAccessToken(admin: AdminClient, athleteId: string, connection: Row): Promise<string> {
+async function refreshAccessToken(admin: AdminClient, athleteId: string, connection: Row, force = false): Promise<string> {
   const expiry = new Date(String(connection.expires_at)).getTime()
   const accessToken = decryptStravaToken(String(connection.access_token_enc))
-  if (expiry > Date.now() + 60 * 60 * 1000) return accessToken
+  if (!force && expiry > Date.now() + 60 * 60 * 1000) return accessToken
   const refreshToken = decryptStravaToken(String(connection.refresh_token_enc))
   const { clientId, clientSecret } = stravaClientCredentials()
-  const response = await fetch('https://www.strava.com/oauth/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, grant_type: 'refresh_token', refresh_token: refreshToken }),
-    cache: 'no-store',
-  })
-  if (!response.ok) throw new Error('Strava access could not be refreshed.')
-  const token = await response.json() as { access_token: string; refresh_token: string; expires_at: number }
+  let response: Response
+  try {
+    response = await fetch('https://www.strava.com/oauth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, grant_type: 'refresh_token', refresh_token: refreshToken }),
+      cache: 'no-store',
+    })
+  } catch {
+    throw new StravaLookupError('temporary')
+  }
+  if (!response.ok) {
+    if ([400, 401, 403].includes(response.status)) throw new StravaLookupError('reconnect', response.status)
+    throw stravaLookupErrorForStatus(response.status)
+  }
+  let token: { access_token: string; refresh_token: string; expires_at: number }
+  try {
+    token = await response.json() as { access_token: string; refresh_token: string; expires_at: number }
+  } catch {
+    throw new StravaLookupError('temporary')
+  }
   const { error } = await admin.from('strava_connections').update({
     access_token_enc: encryptStravaToken(token.access_token),
     refresh_token_enc: encryptStravaToken(token.refresh_token),
     expires_at: new Date(token.expires_at * 1000).toISOString(),
     updated_at: new Date().toISOString(),
   }).eq('athlete_id', athleteId)
-  if (error) throw new Error('The refreshed Strava connection could not be saved.')
+  if (error) throw new StravaLookupError('server')
   return token.access_token
 }
 
 async function getConnection(admin: AdminClient, athleteId: string): Promise<{ connection: Row; token: string }> {
   const { data, error } = await admin.from('strava_connections').select('*').eq('athlete_id', athleteId).eq('is_active', true).maybeSingle()
-  if (error || !data) throw new Error('No active Strava connection was found.')
+  if (error) throw new StravaLookupError('server')
+  if (!data) throw new StravaLookupError('not_connected')
   const connection = data as unknown as Row
   return { connection, token: await refreshAccessToken(admin, athleteId, connection) }
 }
 
 async function stravaGet<T>(path: string, accessToken: string, allowMissing = false): Promise<T | null> {
-  const response = await fetch('https://www.strava.com/api/v3' + path, {
-    headers: { Authorization: 'Bearer ' + accessToken },
-    cache: 'no-store',
-  })
+  let response: Response
+  try {
+    response = await fetch('https://www.strava.com/api/v3' + path, {
+      headers: { Authorization: 'Bearer ' + accessToken },
+      cache: 'no-store',
+    })
+  } catch {
+    throw new StravaLookupError('temporary')
+  }
   if (allowMissing && (response.status === 403 || response.status === 404)) return null
-  if (!response.ok) throw new Error('Strava data could not be loaded.')
-  return await response.json() as T
+  if (!response.ok) throw stravaLookupErrorForStatus(response.status)
+  try {
+    return await response.json() as T
+  } catch {
+    throw new StravaLookupError('temporary')
+  }
 }
 
 function isRun(activity: StravaSummaryActivity): boolean {
@@ -341,10 +386,19 @@ async function activitiesAroundWorkout(admin: AdminClient, athleteId: string, wo
   if (!/^\d{4}-\d{2}-\d{2}$/.test(workoutDate) || Number.isNaN(new Date(workoutDate + 'T00:00:00.000Z').getTime())) {
     throw new Error('De datum van de training is ongeldig.')
   }
-  const { token } = await getConnection(admin, athleteId)
+  const { connection, token: initialToken } = await getConnection(admin, athleteId)
   const after = Math.floor(new Date(dateOffset(workoutDate, -1) + 'T00:00:00.000Z').getTime() / 1000)
   const before = Math.floor(new Date(dateOffset(workoutDate, 2) + 'T00:00:00.000Z').getTime() / 1000)
-  const activities = await stravaGet<StravaSummaryActivity[]>(`/athlete/activities?after=${after}&before=${before}&page=1&per_page=100`, token)
+  const path = `/athlete/activities?after=${after}&before=${before}&page=1&per_page=100`
+  let token = initialToken
+  let activities: StravaSummaryActivity[] | null
+  try {
+    activities = await stravaGet<StravaSummaryActivity[]>(path, token)
+  } catch (error) {
+    if (!(error instanceof StravaLookupError) || error.code !== 'reconnect' || error.status !== 401) throw error
+    token = await refreshAccessToken(admin, athleteId, connection, true)
+    activities = await stravaGet<StravaSummaryActivity[]>(path, token)
+  }
   return { token, activities: (Array.isArray(activities) ? activities : []).filter((activity) => isRun(activity) && isDateAroundWorkout(activity, workoutDate)) }
 }
 
@@ -358,14 +412,14 @@ export async function getStravaActivityCandidates(admin: AdminClient, athleteId:
     .eq('athlete_id', athleteId)
     .eq('source', 'strava')
     .in('external_activity_id', externalIds)
-  if (activityError) throw new Error('De Strava-activiteiten konden niet worden gecontroleerd.')
+  if (activityError) throw new StravaLookupError('server')
 
   const savedRows = (savedActivities ?? []) as Array<{ id: string; external_activity_id: string }>
   const savedIds = savedRows.map((row) => String(row.id))
   const { data: links, error: linkError } = savedIds.length
     ? await admin.from('activity_workout_links').select('activity_id,planned_workout_id,match_method').in('activity_id', savedIds)
     : { data: [], error: null }
-  if (linkError) throw new Error('De bestaande trainingskoppelingen konden niet worden gecontroleerd.')
+  if (linkError) throw new StravaLookupError('server')
 
   const activityIdByExternal = new Map(savedRows.map((row) => [String(row.external_activity_id), String(row.id)]))
   const linkMap = new Map<string, Array<{ workoutId: string; method: string }>>()
