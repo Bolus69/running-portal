@@ -221,6 +221,10 @@ h1, h2, h3 { font-family: 'Manrope', 'DM Sans', sans-serif; letter-spacing: -.6p
 .coach-workout-feedback > p, .coach-workout-feedback > small { grid-column: 1 / -1; margin: 0; }
 .coach-workout-feedback > p { color: #59665a; font-size: 10px; line-height: 1.5; }
 .coach-workout-feedback > small { color: #8b9688; font-size: 8px; }
+.workout-feedback-inline { display: grid; grid-template-columns: max-content max-content; align-items: center; gap: 5px 9px; margin: 10px 0 8px; padding: 9px 11px; border: 1px solid #e5ebdc; border-radius: 8px; background: #f7f9f2; }
+.workout-feedback-inline > strong { color: #71806d; font-size: 8px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
+.workout-feedback-inline > span { width: fit-content; padding: 3px 7px; border-radius: 999px; background: #e8f2df; color: #496b3d; font-size: 9px; font-weight: 700; }
+.workout-feedback-inline > p { grid-column: 1 / -1; margin: 0; color: #59665a; font-size: 10px; line-height: 1.5; }
 .plan-disclaimer { display: flex; align-items: flex-start; gap: 8px; margin: 15px 0 0; color: #768274; font-size: 9px; }.plan-disclaimer svg { color: #96aa7b; flex: 0 0 auto; }
 .empty-plan { max-width: 560px; margin: 65px auto 0; padding: 50px 35px; text-align: center; border: 1px dashed #d5ddd0; border-radius: 18px; background: #fff; }.empty-plan-mark { width: 55px; height: 55px; display: grid; place-items: center; margin: 0 auto 18px; background: var(--lime-soft); color: #536f3d; border-radius: 16px; }.empty-plan h2 { margin: 0 0 9px; font-size: 23px; }.empty-plan > p:not(.eyebrow) { color: #7e897f; font-size: 12px; margin: 0 auto 20px; max-width: 380px; }
 
@@ -389,9 +393,10 @@ body { font-size: 15px; line-height: 1.6; }
 .strava-candidate { display: flex; align-items: flex-start; gap: 10px; padding: 10px 11px; border: 1px solid #e2e9dc; border-radius: 8px; background: #fff; cursor: pointer; }
 .strava-candidate.selected { border-color: #acd36b; background: #f6faeb; }
 .strava-candidate.unavailable { background: #f7f8f6; color: #8b9588; cursor: not-allowed; }
-.strava-candidate input { width: 15px; height: 15px; flex: 0 0 auto; margin: 2px 0 0; accent-color: #729d3d; }
-.strava-candidate-copy { display: grid; gap: 2px; min-width: 0; }
-.strava-candidate-copy strong { overflow: hidden; color: #26374a; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.strava-search-section .strava-candidate input[type="radio"] { appearance: auto; box-sizing: border-box; width: 16px; min-width: 16px; height: 16px; padding: 0; border: 0; border-radius: 50%; background: transparent; box-shadow: none; flex: 0 0 16px; margin: 2px 0 0; accent-color: #729d3d; }
+.strava-search-section .strava-candidate input[type="radio"]:focus-visible { outline: 2px solid #91b85a; outline-offset: 3px; }
+.strava-candidate-copy { display: grid; flex: 1 1 auto; gap: 3px; min-width: 0; }
+.strava-candidate-copy strong { color: #26374a; font-size: 10px; overflow-wrap: anywhere; white-space: normal; }
 .strava-candidate-copy span, .strava-candidate-copy small { color: #758274; font-size: 9px; line-height: 1.45; }
 .strava-candidate-empty { margin-top: 2px; }
 @media (max-width: 620px) {
