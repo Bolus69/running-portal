@@ -198,7 +198,7 @@ h1, h2, h3 { font-family: 'Manrope', 'DM Sans', sans-serif; letter-spacing: -.6p
 .plan-overview { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 20px 23px; border-radius: 13px; background: var(--forest); color: #f3f6f1; margin-bottom: 14px; }
 .plan-overview .small-label { color: #abb8ab; font-size: 8px; }
 .plan-overview h2 { margin: 4px 0 4px; font-size: 18px; }
-.plan-overview p { color: #aeb9af; font-size: 10px; margin: 0; }
+.plan-overview p { color: #aeb9af; font-size: 10px; margin: 0; }.plan-entry-hint { display: block; margin-top: 7px; color: #d2dde5; font-size: 9px; line-height: 1.5; }
 .plan-overview-icon { width: 44px; height: 44px; display: grid; place-items: center; background: rgba(201,243,107,.13); color: var(--lime); border-radius: 12px; }
 .plan-week-list { display: grid; gap: 8px; }
 .plan-week { border: 1px solid var(--line); background: white; border-radius: 11px; overflow: hidden; }
@@ -240,7 +240,7 @@ h1, h2, h3 { font-family: 'Manrope', 'DM Sans', sans-serif; letter-spacing: -.6p
 .history-link-status.unlinked { color: #737a72; background: #f3f4ef; }
 .history-meta { display: flex; flex-wrap: wrap; gap: 7px 12px; color: #748077; font-size: 9px; margin-top: 8px; }.history-meta span { white-space: nowrap; }
 .history-feedback { display: flex; gap: 8px; color: #52654c; font-size: 9px; margin: 9px 0 0; }.history-feedback span { color: #9ba39b; }
-.history-note { color: #78847b; font-size: 9px; margin: 7px 0 0; }
+.history-note { color: #78847b; font-size: 9px; margin: 7px 0 0; }.history-entry-actions { margin-top: 9px; }
 .lap-details { margin-top: 10px; padding-top: 9px; border-top: 1px solid #eef1ed; }.lap-details summary { cursor: pointer; color: #566d4b; font-size: 9px; font-weight: 700; }.lap-table { display: grid; gap: 5px; margin-top: 7px; }.lap-table > div { display: grid; grid-template-columns: 1fr repeat(3, minmax(60px, auto)); gap: 10px; color: #77847a; font-size: 9px; }.lap-table > div span:first-child { color: var(--ink-soft); font-weight: 600; }
 .empty-state { padding: 45px 20px; background: white; border: 1px dashed #dce2d9; border-radius: 14px; text-align: center; }.empty-state h3 { margin: 0 0 5px; font-size: 17px; }.empty-state p { color: #859087; font-size: 11px; margin-bottom: 14px; }
 
