@@ -378,6 +378,16 @@ body { font-size: 15px; line-height: 1.6; }
 .activity-upload-note { color: #7d897b; font-size: 9px; line-height: 1.5; }
 .activity-upload-selected { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #496238; font-size: 10px; }
 .activity-upload-error { padding: 9px 11px; color: #9e5240; background: #fff2ef; border: 1px solid #f1d3cc; border-radius: 8px; font-size: 10px; line-height: 1.45; }
+.strava-search-section { display: grid; gap: 8px; }
+.strava-candidate-list { display: grid; gap: 7px; margin-top: 2px; }
+.strava-candidate { display: flex; align-items: flex-start; gap: 10px; padding: 10px 11px; border: 1px solid #e2e9dc; border-radius: 8px; background: #fff; cursor: pointer; }
+.strava-candidate.selected { border-color: #acd36b; background: #f6faeb; }
+.strava-candidate.unavailable { background: #f7f8f6; color: #8b9588; cursor: not-allowed; }
+.strava-candidate input { width: 15px; height: 15px; flex: 0 0 auto; margin: 2px 0 0; accent-color: #729d3d; }
+.strava-candidate-copy { display: grid; gap: 2px; min-width: 0; }
+.strava-candidate-copy strong { overflow: hidden; color: #26374a; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.strava-candidate-copy span, .strava-candidate-copy small { color: #758274; font-size: 9px; line-height: 1.45; }
+.strava-candidate-empty { margin-top: 2px; }
 @media (max-width: 620px) {
   body { font-size: 14px; }
   .page-subtitle { font-size: 12px; }

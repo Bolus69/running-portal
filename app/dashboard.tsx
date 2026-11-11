@@ -12,6 +12,7 @@ import type { ActivityLap, AppRole, AthleteSummary, CoachNote, CoachSuggestion, 
 type View = 'week' | 'plan' | 'history' | 'wellness' | 'profile' | 'coach' | 'athletes' | 'suggestions' | 'athlete-detail'
 type ManualDraft = { name: string; date: string; duration: string; distance: string; heartRate: string; effort: string; note: string; plannedWorkoutId: string }
 type QuickFeedbackDraft = { effort: NonNullable<RunActivity['effort']> | ''; note: string }
+type StravaCandidate = { id: string; name: string; startedAt: string; distanceKm?: number; durationMinutes: number; averageHeartRate?: number; alreadyLinkedToWorkout: boolean; linkedElsewhere: boolean; automaticMatchElsewhere: boolean }
 type WellnessDraft = { sleepHours: string; restingHeartRate: string; recoveryScore: string; note: string; visibleToCoach: boolean }
 type ProfileDraft = { marathonDate: string; goalTime: string; planLength: 12 | 16 | 20; days: number[]; optional: boolean; optionalTrainingDay: number; raceTime: string; raceDistance: string }
 
@@ -154,6 +155,10 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
   const [feedbackDraft, setFeedbackDraft] = useState<QuickFeedbackDraft>({ effort: '', note: '' })
   const [activityFile, setActivityFile] = useState<File | null>(null)
   const [activityUploadError, setActivityUploadError] = useState('')
+  const [stravaCandidates, setStravaCandidates] = useState<StravaCandidate[]>([])
+  const [stravaCandidatesLoaded, setStravaCandidatesLoaded] = useState(false)
+  const [loadingStravaCandidates, setLoadingStravaCandidates] = useState(false)
+  const [selectedStravaCandidateId, setSelectedStravaCandidateId] = useState('')
   const [savingWorkoutFeedback, setSavingWorkoutFeedback] = useState(false)
   const [toast, setToast] = useState('')
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
@@ -261,6 +266,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
   const progress = requiredThisWeek > 0 ? Math.round((completedThisWeek / requiredThisWeek) * 100) : 0
   const nextTraining = activeWeek?.workouts.find((workout) => workout.status === 'planned' && !workout.optional)
   const paces = calculateTrainingPaces(Number(profileDraft.raceDistance), parseDurationToSeconds(profileDraft.raceTime) ?? 0, parseDurationToSeconds(profileDraft.goalTime) ?? undefined)
+  const feedbackLinkedActivity = feedbackWorkout ? data.activities.find((activity) => activity.plannedWorkoutId === feedbackWorkout.id) : undefined
 
   const showToast = (message: string) => setToast(message)
   const go = (next: View) => { setView(next); setSelectedAthlete(null) }
@@ -270,7 +276,36 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
     setFeedbackDraft({ effort: workout.feedback?.effort ?? '', note: workout.feedback?.note ?? '' })
     setActivityFile(null)
     setActivityUploadError('')
+    setStravaCandidates([])
+    setStravaCandidatesLoaded(false)
+    setLoadingStravaCandidates(false)
+    setSelectedStravaCandidateId('')
     setModal('feedback')
+  }
+
+  async function findStravaActivities() {
+    if (!feedbackWorkout || loadingStravaCandidates) return
+    setLoadingStravaCandidates(true)
+    setActivityUploadError('')
+    setStravaCandidatesLoaded(false)
+    try {
+      const response = await fetch('/api/strava/candidates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plannedWorkoutId: feedbackWorkout.id }),
+      })
+      const result = await response.json().catch(() => ({})) as { candidates?: StravaCandidate[]; error?: string }
+      if (!response.ok) {
+        setActivityUploadError(result.error ?? 'Strava-activiteiten konden niet worden opgehaald. Probeer het opnieuw.')
+        return
+      }
+      setStravaCandidates(result.candidates ?? [])
+      setStravaCandidatesLoaded(true)
+    } catch {
+      setActivityUploadError('Strava-activiteiten konden niet worden opgehaald. Controleer je internetverbinding en probeer het opnieuw.')
+    } finally {
+      setLoadingStravaCandidates(false)
+    }
   }
 
   async function saveWorkoutFeedback(event: React.FormEvent<HTMLFormElement>) {
@@ -298,6 +333,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
         plan: current.plan ? { ...current.plan, weeks: current.plan.weeks.map((week) => ({ ...week, workouts: week.workouts.map((workout) => workout.id === feedbackWorkout.id ? { ...workout, status: 'completed', feedback } : workout) })) } : null,
       }))
 
+      let stravaActivityLinked = false
       if (activityFile && !demoMode) {
         setFeedbackWorkout((current) => current ? { ...current, status: 'completed', feedback } : current)
         const form = new FormData()
@@ -319,16 +355,29 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
       } else if (activityFile && demoMode) {
         setActivityUploadError('Bestanden uploaden kan alleen met je eigen account. Je kunt de training wel afronden.')
         return
+      } else if (selectedStravaCandidateId && !demoMode) {
+        setFeedbackWorkout((current) => current ? { ...current, status: 'completed', feedback } : current)
+        const response = await fetch('/api/strava/attach', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ plannedWorkoutId: feedbackWorkout.id, activityId: selectedStravaCandidateId }),
+        })
+        const result = await response.json().catch(() => ({})) as { error?: string }
+        if (!response.ok) {
+          setActivityUploadError(result.error ?? 'De Strava-activiteit kon niet worden gekoppeld. Probeer het opnieuw.')
+          return
+        }
+        stravaActivityLinked = true
       }
 
       const wasAlreadyCompleted = feedbackWorkout.status === 'completed'
       setModal(null)
       setFeedbackWorkout(null)
       setActivityFile(null)
-      if (activityFile) router.refresh()
-      showToast(activityFile ? 'Training afgerond en bestand aan je schema gekoppeld.' : wasAlreadyCompleted ? 'Je trainingsfeedback is opgeslagen.' : 'Training als uitgevoerd gemarkeerd.')
+      if (activityFile || stravaActivityLinked) router.refresh()
+      showToast(activityFile ? 'Training afgerond en bestand aan je schema gekoppeld.' : stravaActivityLinked ? 'Training afgerond en Strava-activiteit gekoppeld.' : wasAlreadyCompleted ? 'Je trainingsfeedback is opgeslagen.' : 'Training als uitgevoerd gemarkeerd.')
     } catch {
-      setActivityUploadError(activityFile && completionSaved ? 'De training is afgerond, maar het bestand kon niet worden gekoppeld. Probeer het opnieuw.' : 'De trainingsstatus kon niet worden opgeslagen. Probeer het opnieuw.')
+      setActivityUploadError((activityFile || selectedStravaCandidateId) && completionSaved ? 'De training is afgerond, maar de activiteit kon niet worden gekoppeld. Probeer het opnieuw.' : 'De trainingsstatus kon niet worden opgeslagen. Probeer het opnieuw.')
     } finally {
       setSavingWorkoutFeedback(false)
     }
@@ -718,9 +767,11 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
         <div className="invite-note full"><Icon name="check" size={18} /><span>{feedbackWorkout.title}</span></div>
         <div className="field full"><span>Hoe ging de training? <small>optioneel</small></span><div className="quick-effort-options" role="group" aria-label="Hoe voelde de training?">{([{ value: 'easier', label: 'Makkelijker' }, { value: 'as_expected', label: 'Zoals verwacht' }, { value: 'harder', label: 'Zwaarder' }, { value: 'not_good', label: 'Niet goed' }] as const).map((option) => <button key={option.value} type="button" aria-pressed={feedbackDraft.effort === option.value} className={feedbackDraft.effort === option.value ? 'selected' : ''} onClick={() => setFeedbackDraft((current) => ({ ...current, effort: current.effort === option.value ? '' : option.value }))}>{option.label}</button>)}</div></div>
         <label className="field full"><span>Korte toelichting <small>optioneel · maximaal 200 tekens</small></span><textarea rows={2} maxLength={200} value={feedbackDraft.note} onChange={(event) => setFeedbackDraft({ ...feedbackDraft, note: event.target.value })} placeholder="Bijvoorbeeld: voelde soepel, maar lichte knieklachten." /><small className="feedback-character-count">{feedbackDraft.note.length}/200</small></label>
-        {!demoMode && <div className="field full"><span>Trainingbestand <small>optioneel · FIT-bestand tot 4 MB</small></span><input key={activityFile ? activityFile.name + activityFile.size : 'empty'} type="file" accept=".fit,application/octet-stream" disabled={savingWorkoutFeedback} onChange={(event) => { const file = event.currentTarget.files?.[0] ?? null; setActivityUploadError(''); if (file && !file.name.toLowerCase().endsWith('.fit')) { setActivityFile(null); setActivityUploadError('Kies een FIT-bestand (.fit).'); return } if (file && file.size > 4 * 1024 * 1024) { setActivityFile(null); setActivityUploadError('Het bestand moet kleiner zijn dan 4 MB.'); return } setActivityFile(file) }} /><small className="activity-upload-note">We bewaren afstand, duur, hartslag en eventuele blokken. Het originele bestand en de gps-route worden niet opgeslagen.</small>{activityFile && <div className="activity-upload-selected"><span>Geselecteerd: {activityFile.name}</span><button type="button" className="text-button subtle" onClick={() => { setActivityFile(null); setActivityUploadError('') }} disabled={savingWorkoutFeedback}>Verwijderen</button></div>}</div>}
+        {!demoMode && data.stravaConnected && (!feedbackLinkedActivity || feedbackLinkedActivity.source === 'strava') && <div className="field full strava-search-section"><span>Strava-activiteit <small>optioneel</small></span><button type="button" className="button button-outline full-width" onClick={findStravaActivities} disabled={savingWorkoutFeedback || loadingStravaCandidates}><Icon name="link" size={16} /> {loadingStravaCandidates ? 'Activiteiten zoeken…' : stravaCandidatesLoaded ? 'Opnieuw zoeken in Strava' : feedbackLinkedActivity ? 'Andere activiteit zoeken' : 'Zoek activiteit in Strava'}</button><small className="activity-upload-note">We zoeken loopactiviteiten rond de datum van deze training. Kies de juiste activiteit om de gegevens toe te voegen.</small>{stravaCandidatesLoaded && stravaCandidates.length === 0 && <div className="invite-note strava-candidate-empty"><Icon name="history" size={16} /><span>Geen loopactiviteit rond deze datum gevonden. Controleer of de training in Strava staat en zoek opnieuw.</span></div>}{stravaCandidates.length > 0 && <div className="strava-candidate-list" role="radiogroup" aria-label="Kies een Strava-activiteit">{stravaCandidates.map((candidate) => { const unavailable = candidate.linkedElsewhere && !candidate.alreadyLinkedToWorkout; return <label key={candidate.id} className={'strava-candidate' + (selectedStravaCandidateId === candidate.id ? ' selected' : '') + (unavailable ? ' unavailable' : '')}><input type="radio" name="strava-candidate" value={candidate.id} checked={selectedStravaCandidateId === candidate.id} disabled={savingWorkoutFeedback || unavailable} onChange={() => { setSelectedStravaCandidateId(candidate.id); setActivityFile(null); setActivityUploadError('') }} /><span className="strava-candidate-copy"><strong>{candidate.name}</strong><span>{dateLabel(candidate.startedAt, { weekday: 'short', day: 'numeric', month: 'short' })}{candidate.distanceKm !== undefined ? ' · ' + candidate.distanceKm.toFixed(1).replace('.', ',') + ' km' : ''}{candidate.durationMinutes ? ' · ' + candidate.durationMinutes + ' min' : ''}{candidate.averageHeartRate ? ' · ' + Math.round(candidate.averageHeartRate) + ' bpm' : ''}</span>{candidate.alreadyLinkedToWorkout && <small>Al gekoppeld aan deze training</small>}{candidate.linkedElsewhere && !candidate.alreadyLinkedToWorkout && <small>Al gekoppeld aan een andere training</small>}{candidate.automaticMatchElsewhere && <small>Automatische koppeling wordt verplaatst naar deze training</small>}</span></label>})}</div>}</div>}
+        {feedbackLinkedActivity && <div className="invite-note full"><Icon name="check" size={18} /><span>Er is al een activiteit aan deze training gekoppeld ({feedbackLinkedActivity.source === 'strava' ? 'Strava' : feedbackLinkedActivity.source === 'upload' ? 'FIT-bestand' : 'handmatige invoer'}). De gegevens staan bij de training.</span></div>}
+        {!demoMode && !feedbackLinkedActivity && <div className="field full"><span>Trainingbestand <small>optioneel · FIT-bestand tot 4 MB</small></span><input key={activityFile ? activityFile.name + activityFile.size : 'empty'} type="file" accept=".fit,application/octet-stream" disabled={savingWorkoutFeedback} onChange={(event) => { const file = event.currentTarget.files?.[0] ?? null; setActivityUploadError(''); if (file && !file.name.toLowerCase().endsWith('.fit')) { setActivityFile(null); setActivityUploadError('Kies een FIT-bestand (.fit).'); return } if (file && file.size > 4 * 1024 * 1024) { setActivityFile(null); setActivityUploadError('Het bestand moet kleiner zijn dan 4 MB.'); return } setSelectedStravaCandidateId(''); setActivityFile(file) }} /><small className="activity-upload-note">We bewaren afstand, duur, hartslag en eventuele blokken. Het originele bestand en de gps-route worden niet opgeslagen.</small>{activityFile && <div className="activity-upload-selected"><span>Geselecteerd: {activityFile.name}</span><button type="button" className="text-button subtle" onClick={() => { setActivityFile(null); setActivityUploadError('') }} disabled={savingWorkoutFeedback}>Verwijderen</button></div>}</div>}
         {activityUploadError && <div className="activity-upload-error full" role="alert">{activityUploadError}</div>}
-        <div className="modal-actions full"><button type="button" className="button button-outline" onClick={() => setModal(null)} disabled={savingWorkoutFeedback}>Annuleren</button><button className="button button-primary" disabled={savingWorkoutFeedback}>{savingWorkoutFeedback ? 'Opslaan…' : feedbackWorkout.status === 'completed' ? activityFile ? 'Feedback en bestand opslaan' : 'Feedback opslaan' : activityFile ? 'Afronden en bestand uploaden' : 'Training afronden'}</button></div>
+        <div className="modal-actions full"><button type="button" className="button button-outline" onClick={() => setModal(null)} disabled={savingWorkoutFeedback}>Annuleren</button><button className="button button-primary" disabled={savingWorkoutFeedback}>{savingWorkoutFeedback ? 'Opslaan…' : selectedStravaCandidateId ? 'Afronden en Strava-activiteit koppelen' : feedbackWorkout.status === 'completed' ? activityFile ? 'Feedback en bestand opslaan' : 'Feedback opslaan' : activityFile ? 'Afronden en bestand uploaden' : 'Training afronden'}</button></div>
       </form></Modal>}
       {modal === 'invite' && <Modal title="Atleet uitnodigen" subtitle="De atleet krijgt een e-mail om een eigen account te maken." onClose={() => setModal(null)}><form className="form-grid" onSubmit={inviteAthlete}><label className="field full"><span>Naam</span><input name="name" placeholder="Naam van de atleet" /></label><label className="field full"><span>E-mailadres *</span><input name="email" type="email" required placeholder="naam@voorbeeld.nl" /></label><div className="invite-note full"><Icon name="shield" size={18} /><span>Iedere atleet ziet alleen het eigen profiel en de eigen trainingsgegevens.</span></div><div className="modal-actions full"><button type="button" className="button button-outline" onClick={() => setModal(null)}>Annuleren</button><button className="button button-primary">Uitnodiging versturen</button></div></form></Modal>}
       {modal === 'plan' && selectedAthlete && <Modal title="Marathonplan instellen" subtitle={'Maak een persoonlijk schema voor ' + selectedAthlete.name + '.'} onClose={() => setModal(null)}><form className="form-grid" onSubmit={saveCoachPlan}>
