@@ -860,6 +860,7 @@ function PlanView({ plan, activities, onWorkout, expandedWorkout, onEnterWorkout
                     <StatusPill status={workout.status} />
                     <button className="icon-quiet" aria-label="Trainingdetails tonen" onClick={() => onWorkout(expandedWorkout === workout.id ? null : workout.id)}><Icon name="arrow" size={16} /></button>
                   </div>
+                  {workout.feedback && <div className="workout-feedback-inline plan-row-feedback"><strong>Jouw terugkoppeling</strong>{workout.feedback.effort && <span>{effortLabel(workout.feedback.effort)}</span>}{workout.feedback.note && <p>{workout.feedback.note}</p>}</div>}
                   {expandedWorkout === workout.id && <div className="plan-row-detail">
                     <p>{workout.description}</p>
                     <div>{workout.steps.map((step, index) => <span key={index}>{step.label}{step.repeats ? ' · ' + step.repeats + '×' : ''}{step.durationMinutes ? ' · ' + step.durationMinutes + ' min' : ''}</span>)}</div>
