@@ -46,6 +46,16 @@ export async function GET(request: Request) {
     const athleteId = Number(tokens.athlete?.id)
     if (!tokens.access_token || !tokens.refresh_token || !Number.isFinite(athleteId) || athleteId <= 0) throw new Error('token response')
     const admin = createAdminSupabaseClient()
+    const { data: existingConnection, error: lookupError } = await admin.from('strava_connections')
+      .select('athlete_id')
+      .eq('strava_athlete_id', athleteId)
+      .maybeSingle()
+    if (lookupError) throw new Error('connection lookup')
+    if (existingConnection && String(existingConnection.athlete_id) !== user.id) {
+      const response = NextResponse.redirect(new URL('/?strava=already-linked', origin))
+      response.cookies.delete('strava_oauth_state')
+      return response
+    }
     const { error } = await admin.from('strava_connections').upsert({
       athlete_id: user.id,
       strava_athlete_id: athleteId,

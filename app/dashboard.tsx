@@ -246,6 +246,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
           : 'Strava is gekoppeld. De laatste 30 dagen worden ingelezen.',
       'not-configured': 'Strava is nog niet ingesteld. Voeg eerst je Client ID en Client Secret toe in de Vercel-previewinstellingen.',
       cancelled: 'De Strava-koppeling is afgebroken. Je bestaande gegevens zijn niet gewijzigd.',
+      'already-linked': 'Deze Strava-account is al gekoppeld aan een ander Marathon Coach-profiel. Je bestaande trainingen blijven daar staan. Gebruik voor dit profiel een andere Strava-account, of bepaal eerst hoe je de koppeling en gegevens wilt overzetten.',
       error: 'Strava koppelen is niet gelukt. Probeer het opnieuw; je bestaande geschiedenis blijft beschikbaar.',
     }
     const message = messages[status]
