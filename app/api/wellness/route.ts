@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     resting_heart_rate: heartRate,
     recovery_score: recovery,
     note: note || null,
-    visible_to_coach: body.visibleToCoach !== false,
+    visible_to_coach: body.visibleToCoach === true,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'athlete_id,entry_date' })
   if (error) return jsonError('De herstelgegevens konden niet worden opgeslagen.', 500)

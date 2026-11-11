@@ -186,6 +186,8 @@ async function loadPlan(supabase: Awaited<ReturnType<typeof import('@/lib/supaba
     trainingDays: Array.isArray(plan.training_days) ? plan.training_days.map(Number) : [2, 4, 0],
     includeOptionalFourth: Boolean(plan.has_optional_fourth),
     optionalTrainingDay,
+    recentWeeklyKm: plan.recent_weekly_km === null || plan.recent_weekly_km === undefined ? undefined : Number(plan.recent_weekly_km),
+    recentLongestRunKm: plan.recent_longest_run_km === null || plan.recent_longest_run_km === undefined ? undefined : Number(plan.recent_longest_run_km),
   }
 }
 
@@ -226,6 +228,8 @@ async function loadCoachData(supabase: Awaited<ReturnType<typeof import('@/lib/s
       marathonDate,
       goalTime: plan?.goalTime ?? '',
       planLength: plan?.length ?? 16,
+      recentWeeklyKm: plan?.recentWeeklyKm,
+      recentLongestRunKm: plan?.recentLongestRunKm,
       currentWeek: plan?.currentWeek ?? 1,
       phase: currentWeek ? currentWeek.phase : 'Plan nog niet gestart',
       plannedThisWeek: required.length,

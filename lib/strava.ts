@@ -562,14 +562,21 @@ export async function processStravaWebhook(admin: AdminClient, payload: StravaWe
   const { data: connectionData } = await admin.from('strava_connections').select('athlete_id,is_active').eq('strava_athlete_id', payload.owner_id).maybeSingle()
   if (!connectionData) return
   const athleteId = String(connectionData.athlete_id)
-  if (payload.object_type === 'athlete' && payload.aspect_type === 'update' && payload.updates?.authorized === 'false') {
-    await admin.from('strava_connections').update({ access_token_enc: '', refresh_token_enc: '', is_active: false, revoked_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('athlete_id', athleteId)
+  if (payload.object_type === 'athlete' && payload.aspect_type === 'update' && (payload.updates?.authorized === 'false' || payload.updates?.authorized === false)) {
+    const { error } = await admin.from('strava_connections').update({ access_token_enc: '', refresh_token_enc: '', is_active: false, revoked_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('athlete_id', athleteId)
+    if (error) throw new Error('Strava deauthorization could not be recorded')
     return
   }
   if (!connectionData.is_active || payload.object_type !== 'activity') return
   const externalId = String(payload.object_id)
+  if (payload.aspect_type === 'update' && (payload.updates?.private === true || payload.updates?.private === 'true')) {
+    const { error } = await admin.from('activities').delete().eq('athlete_id', athleteId).eq('source', 'strava').eq('external_activity_id', externalId)
+    if (error) throw new Error('Private Strava activity could not be removed')
+    return
+  }
   if (payload.aspect_type === 'delete') {
-    await admin.from('activities').delete().eq('athlete_id', athleteId).eq('source', 'strava').eq('external_activity_id', externalId)
+    const { error } = await admin.from('activities').delete().eq('athlete_id', athleteId).eq('source', 'strava').eq('external_activity_id', externalId)
+    if (error) throw new Error('Deleted Strava activity could not be removed')
     return
   }
   const { token } = await getConnection(admin, athleteId)

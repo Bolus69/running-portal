@@ -420,3 +420,23 @@ body { font-size: 15px; line-height: 1.6; }
   .zone-chip { font-size: 9px; }
   .zone-reference { padding: 13px; }
 }
+
+/* Accessible mobile navigation and supplemental text sizing. */
+.role-switch select:focus-visible { outline: 3px solid #4b6f36; outline-offset: 3px; border-radius: 4px; }
+.plan-baseline { color: #e3edcc; }
+.plan-context-hint { display: block; margin-top: 5px; color: #5b6d7f; font-size: 11px; line-height: 1.5; }
+.training-baseline { border-color: #d5e2c8; background: #f5f8ef; }
+.training-baseline svg { flex: 0 0 auto; color: #4d713d; }
+.mobile-nav button { flex: 1 1 0; min-width: 0; min-height: 48px; font-size: 10px; color: #526477; }
+.mobile-nav button.active { color: #203956; }
+.stat-copy small, .athlete-row-main small, .athlete-row-progress, .linked-activity-summary small { color: #56697d; font-size: 10px; }
+.status-pill, .optional-tag, .plan-row-date, .history-date span { font-size: 9px; }
+.wellness-entry, .wellness-entry.compact, .wellness-entry-score small { color: #536477; font-size: 10px; }
+.field > span small, .privacy-toggle small, .optional-setting small { color: #596d80; }
+.strava-candidate-copy span, .strava-candidate-copy small { color: #536477; font-size: 10px; }
+@media (max-width: 620px) {
+  .mobile-nav { gap: 2px; padding-inline: 4px; }
+  .mobile-nav button { gap: 2px; padding: 5px 2px; font-size: 10px; }
+  .stat-copy > span { font-size: 9px; }
+  .stat-copy small, .athlete-row-main small, .athlete-row-progress { font-size: 9px; }
+}

@@ -43,6 +43,8 @@ export type AthleteSummary = {
   lastFeedback?: string
   lastLongRun?: string
   risk: 'green' | 'orange' | 'red'
+  recentWeeklyKm?: number
+  recentLongestRunKm?: number
   reason?: string
   activities?: RunActivity[]
   wellness?: WellnessEntry[]
@@ -83,6 +85,8 @@ export type DashboardData = {
     trainingDays: number[]
     includeOptionalFourth: boolean
     optionalTrainingDay: number
+    recentWeeklyKm?: number
+    recentLongestRunKm?: number
   } | null
   activities: RunActivity[]
   wellness: WellnessEntry[]
@@ -100,6 +104,8 @@ export type ApiPlanInput = {
   optionalTrainingDay?: number
   recentRaceDistanceKm?: number
   recentRaceTimeSeconds?: number
+  recentWeeklyKm?: number
+  recentLongestRunKm?: number
 }
 
 export type WorkoutUpdate = { id: string; status: WorkoutStatus }
