@@ -62,7 +62,7 @@ export function AcceptInviteForm({ url, publishableKey }: { url: string; publish
           email: userEmail,
           userId,
           errorMessage: authError
-            ? 'Deze uitnodigingslink is verlopen of ongeldig. Vraag je coach om een nieuwe link.'
+            ? 'Deze link kan niet meer worden gebruikt. Hij kan verlopen zijn of al eerder zijn geopend.'
             : null,
         }
       })()
@@ -102,7 +102,7 @@ export function AcceptInviteForm({ url, publishableKey }: { url: string; publish
   }
 
   if (state === 'checking') return <p className="login-help" role="status">Link controleren…</p>
-  if (state === 'invalid') return <div className="invite-invalid"><p className="login-error" role="alert">{errorMessage || 'Deze uitnodiging is verlopen of ongeldig.'}</p><p className="login-help">Vraag je coach om een nieuwe uitnodiging en open de link in dezelfde browser.</p><Link className="button button-outline full-width" href="/login">Naar inloggen</Link></div>
+  if (state === 'invalid') return <div className="invite-invalid"><p className="login-error" role="alert">{errorMessage || 'Deze link kan niet meer worden gebruikt. Hij kan verlopen zijn of al eerder zijn geopend.'}</p><p className="login-help">Heb je je account al geactiveerd? Log dan in of vraag een nieuw wachtwoord aan. Is dit je eerste keer? Vraag je coach om een nieuwe uitnodiging en open die in dezelfde browser.</p><Link className="button button-outline full-width" href="/login">Naar inloggen</Link></div>
   if (state === 'saved') return <p className="invite-success" role="status">Je wachtwoord is ingesteld. Je wordt doorgestuurd…</p>
 
   return <form className="login-form" onSubmit={setNewPassword}>

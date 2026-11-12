@@ -199,6 +199,22 @@ async function loadWellness(supabase: Awaited<ReturnType<typeof import('@/lib/su
 async function loadCoachData(supabase: Awaited<ReturnType<typeof import('@/lib/supabase/server').createServerSupabaseClient>>, userId: string, fullName: string): Promise<DashboardData> {
   const { data: relationshipData } = await supabase.from('coach_athletes').select('athlete_id').eq('coach_id', userId).eq('status', 'active').limit(50)
   const athleteIds = [...new Set(((relationshipData ?? []) as unknown as Row[]).map((item) => String(item.athlete_id)))]
+  const admin = createAdminSupabaseClient()
+  const emailByAthleteId = new Map<string, string>()
+  for (let offset = 0; offset < athleteIds.length; offset += 10) {
+    const batch = athleteIds.slice(offset, offset + 10)
+    const emailResults = await Promise.all(batch.map(async (athleteId) => {
+      try {
+        const { data, error } = await admin.auth.admin.getUserById(athleteId)
+        return { athleteId, email: error ? undefined : data.user?.email }
+      } catch {
+        return { athleteId, email: undefined }
+      }
+    }))
+    for (const result of emailResults) {
+      if (result.email) emailByAthleteId.set(result.athleteId, result.email)
+    }
+  }
   const [profileResult, suggestionResult, noteResult] = await Promise.all([
     athleteIds.length ? supabase.from('profiles').select('id,full_name').in('id', athleteIds) : Promise.resolve({ data: [] }),
     supabase.from('coach_suggestions').select('*').eq('coach_id', userId).order('created_at', { ascending: false }).limit(50),
@@ -225,6 +241,7 @@ async function loadCoachData(supabase: Awaited<ReturnType<typeof import('@/lib/s
     return {
       id: athleteId,
       name: nameById.get(athleteId) ?? 'Atleet',
+      email: emailByAthleteId.get(athleteId),
       marathonDate,
       goalTime: plan?.goalTime ?? '',
       planLength: plan?.length ?? 16,
@@ -260,7 +277,6 @@ async function loadCoachData(supabase: Awaited<ReturnType<typeof import('@/lib/s
       createdAt: String(row.created_at),
     }
   })
-  const admin = createAdminSupabaseClient()
   const [{ data: stravaConnection }, activities] = await Promise.all([
     admin.from('strava_connections').select('is_active').eq('athlete_id', userId).maybeSingle(),
     loadActivities(supabase, userId),

@@ -32,6 +32,7 @@ export type CoachNote = { id: string; note: string; createdAt: string }
 export type AthleteSummary = {
   id: string
   name: string
+  email?: string
   marathonDate: string
   goalTime: string
   planLength: PlanLength
