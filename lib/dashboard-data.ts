@@ -186,6 +186,8 @@ async function loadPlan(supabase: Awaited<ReturnType<typeof import('@/lib/supaba
     trainingDays: Array.isArray(plan.training_days) ? plan.training_days.map(Number) : [2, 4, 0],
     includeOptionalFourth: Boolean(plan.has_optional_fourth),
     optionalTrainingDay,
+    recentRaceDistanceKm: plan.recent_race_distance_km === null || plan.recent_race_distance_km === undefined ? undefined : Number(plan.recent_race_distance_km),
+    recentRaceTimeSeconds: plan.recent_race_time_seconds === null || plan.recent_race_time_seconds === undefined ? undefined : Number(plan.recent_race_time_seconds),
     recentWeeklyKm: plan.recent_weekly_km === null || plan.recent_weekly_km === undefined ? undefined : Number(plan.recent_weekly_km),
     recentLongestRunKm: plan.recent_longest_run_km === null || plan.recent_longest_run_km === undefined ? undefined : Number(plan.recent_longest_run_km),
   }

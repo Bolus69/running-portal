@@ -86,6 +86,8 @@ export type DashboardData = {
     trainingDays: number[]
     includeOptionalFourth: boolean
     optionalTrainingDay: number
+    recentRaceDistanceKm?: number
+    recentRaceTimeSeconds?: number
     recentWeeklyKm?: number
     recentLongestRunKm?: number
   } | null
