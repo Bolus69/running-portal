@@ -441,3 +441,6 @@ body { font-size: 15px; line-height: 1.6; }
   .stat-copy > span { font-size: 9px; }
   .stat-copy small, .athlete-row-main small, .athlete-row-progress { font-size: 9px; }
 }
+.pace-reference .pace-preview { margin-top: 12px; padding: 0; border: 0; background: transparent; }
+.pace-reference .pace-preview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 900px) { .profile-side { grid-template-columns: minmax(0, 1fr); } }
