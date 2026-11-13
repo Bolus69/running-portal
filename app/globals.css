@@ -458,14 +458,14 @@ body { font-size: 15px; line-height: 1.6; }
   box-shadow: 0 10px 24px rgba(23,58,86,.1);
   overflow: hidden;
 }
-.tab-photo-banner.photo-plan { background-image: linear-gradient(100deg, rgba(23,58,86,.48), rgba(23,58,86,.08)), url("https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?auto=format&fit=crop&w=1600&q=82"); background-position: center 54%; }
-.tab-photo-banner.photo-history { background-image: linear-gradient(100deg, rgba(23,58,86,.48), rgba(23,58,86,.08)), url("https://images.unsplash.com/photo-1552674605-db6ffd4facb5?auto=format&fit=crop&w=1600&q=82"); background-position: center 52%; }
-.tab-photo-banner.photo-wellness { background-image: linear-gradient(100deg, rgba(23,58,86,.5), rgba(23,58,86,.12)), url("https://images.unsplash.com/photo-1571008887538-b36bb32f4571?auto=format&fit=crop&w=1600&q=82"); background-position: center 44%; }
-.tab-photo-banner.photo-profile { background-image: linear-gradient(100deg, rgba(23,58,86,.5), rgba(23,58,86,.12)), url("https://images.unsplash.com/photo-1533561052604-c3beb6d55b8d?auto=format&fit=crop&w=1600&q=82"); background-position: center 50%; }
-.tab-photo-banner.photo-coach { background-image: linear-gradient(100deg, rgba(23,58,86,.52), rgba(23,58,86,.1)), url("https://images.unsplash.com/photo-1552674605-db6ffd4facb5?auto=format&fit=crop&w=1600&q=82"); background-position: center 40%; }
-.tab-photo-banner.photo-athletes { background-image: linear-gradient(100deg, rgba(23,58,86,.52), rgba(23,58,86,.1)), url("https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?auto=format&fit=crop&w=1600&q=82"); background-position: center 50%; }
-.tab-photo-banner.photo-suggestions { background-image: linear-gradient(100deg, rgba(23,58,86,.52), rgba(23,58,86,.1)), url("https://images.unsplash.com/photo-1571008887538-b36bb32f4571?auto=format&fit=crop&w=1600&q=82"); background-position: center 53%; }
-.tab-photo-banner.photo-athlete-detail { background-image: linear-gradient(100deg, rgba(23,58,86,.52), rgba(23,58,86,.1)), url("https://images.unsplash.com/photo-1533561052604-c3beb6d55b8d?auto=format&fit=crop&w=1600&q=82"); background-position: center 45%; }
+.tab-photo-banner.photo-plan { background-image: linear-gradient(100deg, rgba(23,58,86,.42), rgba(23,58,86,.08)), url("https://images.unsplash.com/photo-1781029102793-9b435d7c1cca?auto=format&fit=crop&w=1600&q=82"); background-position: center 54%; }
+.tab-photo-banner.photo-history { background-image: linear-gradient(100deg, rgba(23,58,86,.42), rgba(23,58,86,.08)), url("https://images.unsplash.com/photo-1769707948199-0ac6f2868e55?auto=format&fit=crop&w=1600&q=82"); background-position: center 52%; }
+.tab-photo-banner.photo-wellness { background-image: linear-gradient(100deg, rgba(23,58,86,.46), rgba(23,58,86,.1)), url("https://images.unsplash.com/photo-1726195221456-7e104a23bbff?auto=format&fit=crop&w=1600&q=82"); background-position: center 44%; }
+.tab-photo-banner.photo-profile { background-image: linear-gradient(100deg, rgba(23,58,86,.45), rgba(23,58,86,.1)), url("https://images.unsplash.com/photo-1786630251101-0f0ce3470cb6?auto=format&fit=crop&w=1600&q=82"); background-position: center 50%; }
+.tab-photo-banner.photo-coach { background-image: linear-gradient(100deg, rgba(23,58,86,.44), rgba(23,58,86,.08)), url("https://images.unsplash.com/photo-1781029102793-9b435d7c1cca?auto=format&fit=crop&w=1600&q=82"); background-position: center 40%; }
+.tab-photo-banner.photo-athletes { background-image: linear-gradient(100deg, rgba(23,58,86,.42), rgba(23,58,86,.08)), url("https://images.unsplash.com/photo-1769707948199-0ac6f2868e55?auto=format&fit=crop&w=1600&q=82"); background-position: center 50%; }
+.tab-photo-banner.photo-suggestions { background-image: linear-gradient(100deg, rgba(23,58,86,.45), rgba(23,58,86,.1)), url("https://images.unsplash.com/photo-1786630251101-0f0ce3470cb6?auto=format&fit=crop&w=1600&q=82"); background-position: center 53%; }
+.tab-photo-banner.photo-athlete-detail { background-image: linear-gradient(100deg, rgba(23,58,86,.46), rgba(23,58,86,.1)), url("https://images.unsplash.com/photo-1726195221456-7e104a23bbff?auto=format&fit=crop&w=1600&q=82"); background-position: center 45%; }
 
 .workout-type-icon.type-easy, .history-activity-icon.type-easy { color: #2D6688; background: #E7F1F8; }
 .workout-type-icon.type-quality, .history-activity-icon.type-quality { color: #4E6592; background: #E9EDF7; }
@@ -512,12 +512,71 @@ body { font-size: 15px; line-height: 1.6; }
 .wellness-entry strong { font-size: 12px; }
 .stat-copy > span, .stat-copy small, .athlete-row-main small, .athlete-row-progress { font-size: 11px; }
 
+/* Shared runner symbol, integrated plan photo, and a usable account menu. */
+.nav-item .logo-mark { width: 21px; height: 21px; border-radius: 5px; flex: 0 0 21px; }
+.mobile-nav .logo-mark { width: 19px; height: 19px; border-radius: 5px; }
+.plan-overview.plan-overview-hero {
+  position: relative;
+  isolation: isolate;
+  min-height: 205px;
+  padding: 27px 30px;
+  border: 1px solid rgba(255,255,255,.16);
+  background: linear-gradient(100deg, rgba(23,58,86,.97) 0%, rgba(23,58,86,.9) 48%, rgba(23,58,86,.48) 100%),
+    url("https://images.unsplash.com/photo-1781029102793-9b435d7c1cca?auto=format&fit=crop&w=1600&q=85") center 46% / cover no-repeat,
+    var(--forest);
+  box-shadow: 0 14px 34px rgba(23,58,86,.15);
+}
+.plan-overview-hero > div:first-child { position: relative; z-index: 1; max-width: 820px; }
+.plan-overview-hero .small-label { color: #d4e2eb; }
+.plan-overview-hero h2 { color: #fff; font-size: 21px; line-height: 1.35; }
+.plan-overview-hero p { color: #e0e9ef; font-size: 13px; }
+.plan-overview-hero .plan-entry-hint { color: #e2ebf0; font-size: 11px; }
+.plan-overview-hero .plan-baseline { color: #eff8d7; }
+.plan-overview-hero .plan-overview-icon { position: relative; z-index: 1; flex: 0 0 auto; color: var(--lime); background: rgba(213,243,107,.16); border: 1px solid rgba(213,243,107,.18); }
+.coach-card { position: relative; }
+.account-menu-wrap { position: relative; margin-left: auto; flex: 0 0 auto; }
+.account-menu-wrap > .icon-quiet { width: 34px; height: 34px; margin: 0; }
+.account-menu {
+  position: absolute;
+  z-index: 40;
+  right: 0;
+  bottom: calc(100% + 8px);
+  width: 216px;
+  display: grid;
+  gap: 3px;
+  padding: 6px;
+  border: 1px solid #d9e3eb;
+  border-radius: 11px;
+  background: #fff;
+  box-shadow: 0 16px 38px rgba(11,29,45,.24);
+}
+.account-menu form { margin: 0; }
+.account-menu button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 11px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+}
+.account-menu button:hover, .account-menu button:focus-visible { background: #eff5f8; color: var(--forest); }
+
 @media (max-width: 620px) {
   .coach-add-training .desktop-cta-label { display: none; }
   .coach-add-training .mobile-cta-label { display: inline; max-width: none; }
   .coach-add-training.button-compact span { max-width: none; overflow: visible; }
   .tab-photo-banner { height: 108px; margin: -5px 0 18px; border-radius: 12px; }
   .plan-row > .plan-row-main { min-width: 0; }
+  .plan-overview.plan-overview-hero { min-height: 180px; padding: 19px 16px; background-position: 58% center; }
+  .plan-overview-hero h2 { max-width: 90%; font-size: 16px; }
+  .plan-overview-hero p { max-width: 90%; font-size: 11px; }
+  .plan-overview-hero .plan-entry-hint { max-width: 95%; font-size: 10px; }
   .plan-row-main .workout-type-icon { width: 27px; height: 27px; }
   .plan-row-copy strong { font-size: 12px; }
   .plan-row-detail { padding-left: 37px; font-size: 11px; }
