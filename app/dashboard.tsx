@@ -54,7 +54,7 @@ function PlanTimingNote({ draft }: { draft: ProfileDraft }) {
 
 function Icon({ name, size = 19 }: { name: string; size?: number }) {
   const common = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true as const }
-  const runnerMark = <><circle cx="16" cy="4" r="2.1" fill="currentColor" stroke="none" /><path d="m13.8 7.3-2.4 3.9 3.7 2.1M13.8 7.3l3.1 1.8 3.4-1.6M13.8 7.3l-3.3-1-2.5 1.8M11.4 11.2l-3.3 3.7-4 1.4-1.5 2.3M15.1 13.3l3.4 2.3 2.6 3.2" stroke="currentColor" strokeWidth="2.2" /></>
+  const runnerMark = <><circle cx="15.8" cy="4.1" r="2.1" fill="currentColor" stroke="none" /><path d="m13.5 7.4-2.4 4.1M13.5 7.4l3.2 1.4 3.4-1.7M13.5 7.4l-3.2-1.1-2.5 1.8M11.1 11.5l-3.3 3-3.7 3.2M11.1 11.5l4.1 2.1 2.9 3.4" stroke="currentColor" strokeWidth="2.2" /></>
   const paths: Record<string, React.ReactNode> = {
     week: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/><path d="m8 15 2 2 5-5"/></>,
     plan: <><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21z"/><path d="M4 5.5v15M8 7h8M8 11h7"/></>,
@@ -743,11 +743,10 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
           {navItems.map((item) => <NavItem key={item.id} icon={item.icon} label={item.label} active={view === item.id || (view === 'athlete-detail' && item.id === 'athletes')} onClick={() => go(item.id)} />)}
         </nav>
         <div className="sidebar-bottom">
-          <button type="button" className="coach-card" aria-label={'Profiel en instellingen voor ' + data.profile.name + ' openen'} onClick={() => { go('profile'); window.scrollTo({ top: 0, behavior: 'smooth' }) }}>
+          <div className="coach-card">
             <span className="coach-avatar">{data.profile.name.charAt(0).toUpperCase()}</span>
             <span className="coach-card-identity"><strong>{data.profile.name}</strong><span>{role === 'coach' ? 'Coach' : 'Atleet'}</span></span>
-            <Icon name="arrow" size={16} />
-          </button>
+          </div>
           <div className="side-brand-note"><LogoMark small /><span>Train met aandacht.<br />Loop met vertrouwen.</span></div>
         </div>
       </aside>

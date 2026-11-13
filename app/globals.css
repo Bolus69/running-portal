@@ -47,15 +47,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .nav-item.active svg { color: var(--lime); }
 .nav-active-dot { width: 5px; height: 5px; margin-left: auto; border-radius: 50%; background: var(--lime); }
 .sidebar-bottom { margin-top: auto; }
-.coach-card { width: 100%; display: flex; align-items: center; gap: 10px; padding: 14px 8px; border: 0; border-top: 1px solid var(--line-dark); border-bottom: 1px solid var(--line-dark); background: transparent; color: #f5f7f2; text-align: left; cursor: pointer; transition: background .16s ease; }
-.coach-card:hover { background: rgba(255,255,255,.055); }
+.coach-card { display: flex; align-items: center; gap: 10px; padding: 14px 8px; border-top: 1px solid var(--line-dark); border-bottom: 1px solid var(--line-dark); color: #f5f7f2; }
 .coach-avatar, .profile-avatar { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: #dce9c4; color: #42543c; font-family: 'Manrope', sans-serif; font-weight: 800; }
 .coach-card-identity { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
 .coach-card-identity strong { color: #fff; font-size: 13px; }
 .coach-card-identity > span { margin: 0; color: #aab5ab; font-size: 10px; line-height: 1.4; }
-.coach-card > svg { margin-left: auto; flex: 0 0 auto; color: #aab5ab; transition: transform .16s ease; }
-.coach-card:hover > svg { color: #fff; transform: translateX(2px); }
-.coach-card:focus-visible { outline: 3px solid var(--lime); outline-offset: 2px; }
 .icon-quiet { border: 0; background: transparent; color: var(--muted); padding: 6px; display: inline-grid; place-items: center; border-radius: 8px; }
 .icon-quiet:hover { background: #f0f2ed; color: var(--ink); }
 .side-brand-note { display: flex; align-items: center; gap: 9px; padding: 18px 8px 0; color: #aeb9af; font-size: 10px; line-height: 1.5; }
@@ -464,11 +460,11 @@ body { font-size: 15px; line-height: 1.6; }
 .tab-photo-banner.photo-suggestions { background-image: linear-gradient(100deg, rgba(23,58,86,.45), rgba(23,58,86,.1)), url("https://images.unsplash.com/photo-1786630251101-0f0ce3470cb6?auto=format&fit=crop&w=1600&q=82"); background-position: center 53%; }
 .tab-photo-banner.photo-athlete-detail { background-image: linear-gradient(100deg, rgba(23,58,86,.46), rgba(23,58,86,.1)), url("https://images.unsplash.com/photo-1726195221456-7e104a23bbff?auto=format&fit=crop&w=1600&q=82"); background-position: center 45%; }
 
-.workout-type-icon.type-easy, .history-activity-icon.type-easy { color: #1464A5; background: #E4F1FC; }
-.workout-type-icon.type-quality, .history-activity-icon.type-quality { color: #7042C5; background: #EFE8FC; }
-.workout-type-icon.type-long, .history-activity-icon.type-long { color: #08796D; background: #DDF4EE; }
-.workout-type-icon.type-optional, .history-activity-icon.type-optional { color: #A85800; background: #FFF0D9; }
-.workout-type-icon.type-race, .history-activity-icon.type-race { color: #B5364C; background: #FCE8EC; }
+.workout-type-icon.type-easy, .history-activity-icon.type-easy { color: #1259A8; background: #DDEBFF; }
+.workout-type-icon.type-quality, .history-activity-icon.type-quality { color: #C04B05; background: #FFE7D3; }
+.workout-type-icon.type-long, .history-activity-icon.type-long { color: #087C59; background: #DDF5E9; }
+.workout-type-icon.type-optional, .history-activity-icon.type-optional { color: #7938B7; background: #F0E2FF; }
+.workout-type-icon.type-race, .history-activity-icon.type-race { color: #B52B45; background: #FBE3E8; }
 .plan-row > .plan-row-main { display: flex; flex-direction: row; align-items: center; gap: 10px; min-width: 175px; flex: 1; }
 .plan-row-main .workout-type-icon { width: 30px; height: 30px; border-radius: 9px; }
 .plan-row-copy { display: flex; flex-direction: column; min-width: 0; }
