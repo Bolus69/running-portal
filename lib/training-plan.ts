@@ -92,10 +92,10 @@ const PHASES: Record<PlanLength, { phase: Phase; first: number; last: number }[]
 
 const DAY_NAMES = ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za']
 const PHASE_LABELS: Record<Phase, string> = {
-  basis: 'Basisfase',
-  ontwikkeling: 'Algemene ontwikkelfase',
-  marathonspecifiek: 'Marathonspecifieke fase',
-  taper: 'Taperfase',
+  basis: 'Basis',
+  ontwikkeling: 'Opbouw',
+  marathonspecifiek: 'Specifiek',
+  taper: 'Taper',
 }
 
 function utcDate(date: string): Date {
@@ -146,7 +146,7 @@ function phaseFor(length: PlanLength, week: number): Phase {
 function phaseGoal(phase: Phase, recovery: boolean): string {
   if (recovery) return 'Herstel en ritme: minder volume, ontspannen lopen.'
   if (phase === 'basis') return 'Rustige kilometers en een vaste trainingsroutine.'
-  if (phase === 'ontwikkeling') return 'Gecontroleerde drempelprikkel en rustige duur.'
+  if (phase === 'ontwikkeling') return 'Stevige, gecontroleerde blokken en rustige duur.'
   if (phase === 'marathonspecifiek') return 'Marathoninspanning oefenen en lange duur opbouwen.'
   return 'Vermoeidheid laten zakken en fris aan de start komen.'
 }
@@ -205,15 +205,15 @@ function qualitySession(week: number, phase: Phase, recovery: boolean): PlannedW
       id: 'quality-' + week,
       date: '',
       day: '',
-      title: (phase === 'marathonspecifiek' ? 'Drempelblokken' : 'Drempelblokken') + ' · ' + blocks + ' × ' + minutes + ' min (Z3)',
+      title: 'Stevige blokken · ' + blocks + ' × ' + minutes + ' min (Z3)',
       type: 'quality',
       durationMinutes: phase === 'marathonspecifiek' ? 55 : 52,
-      intensity: 'Z3 · gecontroleerde drempel',
-      goal: 'Een gelijkmatige, herhaalbare drempelinspanning.',
+      intensity: 'Z3 · stevig en beheerst',
+      goal: 'Een gelijkmatige, herhaalbare stevige inspanning.',
       description: 'Loop stevig maar beheerst. Je moet de laatste herhaling technisch goed kunnen afronden. Dribbel 2 minuten rustig in Z1 tussen de blokken.',
       steps: [
         { kind: 'warmup', label: 'Rustig inlopen (Z1)', durationMinutes: 12, intensity: 'E', all4runningZone: 1 },
-        { kind: 'work', label: 'Drempelblok', durationMinutes: minutes, repeats: blocks, intensity: 'T', all4runningZone: 3 },
+        { kind: 'work', label: 'Stevig blok', durationMinutes: minutes, repeats: blocks, intensity: 'T', all4runningZone: 3 },
         { kind: 'recovery', label: 'Dribbelpauze (Z1)', durationMinutes: 2, repeats: blocks - 1, intensity: 'E', all4runningZone: 1 },
         { kind: 'cooldown', label: 'Uitlopen (Z1)', durationMinutes: 10, intensity: 'E', all4runningZone: 1 },
       ],

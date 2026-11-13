@@ -69,6 +69,17 @@ function Icon({ name, size = 19 }: { name: string; size?: number }) {
     check: <path d="m5 12 4 4L19 6"/>,
     clock: <><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>,
     close: <><path d="m6 6 12 12M18 6 6 18"/></>,
+    logout: <><path d="M10 17l5-5-5-5M15 12H3"/><path d="M12 3h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7"/></>,
+    mood1: <><circle cx="12" cy="12" r="9"/><path d="M9 10h.01M15 10h.01" strokeWidth="2.5"/><path d="M8 17c1-2 2.5-3 4-3s3 1 4 3"/></>,
+    mood2: <><circle cx="12" cy="12" r="9"/><path d="M9 10h.01M15 10h.01" strokeWidth="2.5"/><path d="M8.5 16.5c1-1.2 2.2-1.8 3.5-1.8s2.5.6 3.5 1.8"/></>,
+    mood3: <><circle cx="12" cy="12" r="9"/><path d="M9 10h.01M15 10h.01" strokeWidth="2.5"/><path d="M8 16h8"/></>,
+    mood4: <><circle cx="12" cy="12" r="9"/><path d="M9 10h.01M15 10h.01" strokeWidth="2.5"/><path d="M8.5 15.5c1 1.2 2.2 1.8 3.5 1.8s2.5-.6 3.5-1.8"/></>,
+    mood5: <><circle cx="12" cy="12" r="9"/><path d="M9 10h.01M15 10h.01" strokeWidth="2.5"/><path d="M8 15c1 2 2.5 3 4 3s3-1 4-3"/></>,
+    easy: <><path d="M12 4v4M7 7l2.5 2.5M4 13h4M16 9.5 19 7M16 13h4"/><path d="M6 20c1.6-2.2 3.6-3.2 6-3.2s4.4 1 6 3.2"/><circle cx="12" cy="12" r="2.2"/></>,
+    intervals: <><path d="M4 6h5M15 6h5M4 12h3M17 12h3M4 18h5M15 18h5"/><path d="m9 4 3 2-3 2M15 4l-3 2 3 2M7 10l3 2-3 2M17 10l-3 2 3 2M9 16l3 2-3 2M15 16l-3 2 3 2"/></>,
+    longRun: <><path d="M5 19c2-1.5 2.5-3.5 1-5s-1-3.5 1-5 2.5-3.5 1-5"/><path d="M12 19c2-1.5 2.5-3.5 1-5s-1-3.5 1-5 2.5-3.5 1-5"/><path d="M18 19h3"/></>,
+    race: <><path d="M5 21V4M5 5h13l-2 3 2 3H5"/><path d="m9 18 2 2 4-4"/></>,
+    recovery: <><path d="M20.8 8.8c0 5.1-8.8 10.2-8.8 10.2S3.2 13.9 3.2 8.8A4.8 4.8 0 0 1 12 6.1a4.8 4.8 0 0 1 8.8 2.7Z"/><path d="M12 8v4l2.5 1.5"/></>,
     chevron: <path d="m7 10 5 5 5-5"/>,
     shield: <><path d="M12 3 20 6v5c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/><path d="m9 12 2 2 4-4"/></>,
     link: <><path d="M10 13a5 5 0 0 0 7.1 0l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1"/><path d="M14 11a5 5 0 0 0-7.1 0l-2 2a5 5 0 0 0 7.1 7.1l1.1-1.1"/></>,
@@ -107,7 +118,7 @@ function paceIntensityLabel(value?: string): string {
   const labels: Record<string, string> = {
     E: 'Rustig tempo',
     M: 'Marathontempo',
-    T: 'Drempeltempo',
+    T: 'Stevig tempo',
     I: 'Intervaltempo',
     R: 'Korte versnellingen',
   }
@@ -120,6 +131,20 @@ function workoutTitleLabel(value: string): string {
 
 function effortLabel(value?: RunActivity['effort']): string {
   return ({ easier: 'Makkelijker dan verwacht', as_expected: 'Zoals verwacht', harder: 'Zwaarder dan verwacht', not_good: 'Niet goed gegaan' } as const)[value ?? 'as_expected']
+}
+
+const RECOVERY_LABELS = ['Slecht', 'Matig', 'Neutraal', 'Goed', 'Heel goed'] as const
+
+function recoveryLabel(value: number): string {
+  return RECOVERY_LABELS[value - 1] ?? 'Niet ingevuld'
+}
+
+function RecoveryMood({ value, size = 17 }: { value: number; size?: number }) {
+  return <span className="recovery-mood" aria-label={'Herstelgevoel: ' + recoveryLabel(value)}><Icon name={'mood' + value} size={size} /><small>{recoveryLabel(value)}</small></span>
+}
+
+function workoutIconName(type: PlanWeek['workouts'][number]['type']): string {
+  return ({ easy: 'easy', quality: 'intervals', long: 'longRun', optional: 'recovery', race: 'race' } as const)[type]
 }
 
 function activitySourceLabel(source: RunActivity['source']): string {
@@ -155,10 +180,6 @@ function StatusPill({ status }: { status: string }) {
   return <span className={'status-pill status-' + status}>{labels[status] ?? status}</span>
 }
 
-function EffortDots({ value }: { value: number }) {
-  return <span className="effort-dots" aria-label={'Herstelgevoel ' + value + ' van 5'}>{[1, 2, 3, 4, 5].map((item) => <i key={item} className={item <= value ? 'active' : ''} />)}</span>
-}
-
 function NavItem({ icon, label, active, onClick }: { icon: string; label: string; active: boolean; onClick: () => void }) {
   return <button className={'nav-item' + (active ? ' active' : '')} onClick={onClick}><Icon name={icon} /><span>{label}</span>{active && <span className="nav-active-dot" />}</button>
 }
@@ -172,7 +193,7 @@ function TalkTestGuide() {
 }
 
 function PaceStrip() {
-  return <div className="pace-strip"><span><i className="pace-dot easy" /><b>Rustig</b></span><span><i className="pace-dot marathon" /><b>Marathon</b></span><span><i className="pace-dot threshold" /><b>Drempel</b></span><span><i className="pace-dot interval" /><b>Interval</b></span></div>
+  return <div className="pace-strip"><span><i className="pace-dot easy" /><b>Rustig</b></span><span><i className="pace-dot marathon" /><b>Marathon</b></span><span><i className="pace-dot threshold" /><b>Stevig</b></span><span><i className="pace-dot interval" /><b>Interval</b></span></div>
 }
 
 function StatCard({ label, value, detail, icon, tone }: { label: string; value: string; detail: string; icon: string; tone?: string }) {
@@ -184,7 +205,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
   const [data, setData] = useState(initialData)
   const [role, setRole] = useState<AppRole>(initialData.profile.role)
   const [view, setView] = useState<View>(initialData.profile.role === 'coach' ? 'coach' : 'week')
-  const [modal, setModal] = useState<'activity' | 'invite' | 'plan' | 'feedback' | null>(null)
+  const [modal, setModal] = useState<'activity' | 'invite' | 'plan' | 'feedback' | 'select-athlete' | null>(null)
   const [feedbackWorkout, setFeedbackWorkout] = useState<PlanWeek['workouts'][number] | null>(null)
   const [feedbackDraft, setFeedbackDraft] = useState<QuickFeedbackDraft>({ effort: '', note: '' })
   const [activityFile, setActivityFile] = useState<File | null>(null)
@@ -597,7 +618,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
       recentWeeklyKm: coachPlanDraft.recentWeeklyKm ? Number(coachPlanDraft.recentWeeklyKm) : undefined,
       recentLongestRunKm: coachPlanDraft.recentLongestRunKm ? Number(coachPlanDraft.recentLongestRunKm) : undefined,
       currentWeek: 1,
-      phase: 'Basisfase',
+      phase: 'Basis',
       plannedThisWeek: 3,
       completedThisWeek: 0,
       lastLongRun: undefined,
@@ -750,9 +771,9 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
             <div className="coach-avatar">{data.profile.name.charAt(0).toUpperCase()}</div>
             <div><strong>{data.profile.name}</strong><span>{role === 'coach' ? BRAND.subtitle : 'Atleet'}</span></div>
             <div className="account-menu-wrap">
-              <button type="button" aria-label="Accountopties" aria-haspopup="menu" aria-expanded={accountMenuOpen} className="icon-quiet" onClick={() => setAccountMenuOpen((open) => !open)}><Icon name="more" /></button>
+              <button type="button" aria-label="Accountmenu openen" aria-haspopup="menu" aria-expanded={accountMenuOpen} className="icon-quiet" onClick={() => setAccountMenuOpen((open) => !open)}><Icon name="more" /></button>
               {accountMenuOpen && <div className="account-menu" role="menu" aria-label="Accountopties">
-                <button type="button" role="menuitem" onClick={() => { setAccountMenuOpen(false); go('profile') }}>Mijn profiel</button>
+                <button type="button" role="menuitem" onClick={() => { setAccountMenuOpen(false); go('profile') }}>Profiel bekijken</button>
                 {demoMode
                   ? <button type="button" role="menuitem" onClick={() => { window.localStorage.removeItem('marathon-coach-preview-v1'); window.location.reload() }}>Voorbeeld resetten</button>
                   : <form action="/auth/signout" method="post"><button type="submit" role="menuitem">Uitloggen</button></form>}
@@ -769,14 +790,15 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
           <div className="breadcrumb"><span>Marathonplan</span><b>/</b><strong>{title}</strong></div>
           <div className="topbar-actions">
             {demoMode ? <label className="role-switch"><span>Voorbeeld</span><select aria-label="Voorbeeldrol" value={role} onChange={(event) => { const next = event.target.value as AppRole; setRole(next); setData((current) => ({ ...current, profile: { ...current.profile, role: next } })); go(next === 'coach' ? 'coach' : 'week') }}><option value="athlete">Atleet</option><option value="coach">Coach</option></select></label> : <span className="role-label"><span className="live-dot" /> {data.profile.name}</span>}
-            {role === 'athlete' ? <button className="button button-primary button-compact" onClick={() => setModal('activity')}><Icon name="plus" size={17} /><span>Training toevoegen</span></button> : <button className="button button-primary button-compact" onClick={() => setModal('invite')}><Icon name="plus" size={17} /><span>Atleet uitnodigen</span></button>}
-            {!demoMode && <form action="/auth/signout" method="post"><button className="icon-quiet" aria-label="Uitloggen" title="Uitloggen"><Icon name="close" size={17} /></button></form>}
+            {role === 'coach' && <button className="button button-primary button-compact coach-add-training" aria-label="Training toevoegen" onClick={() => view === 'athlete-detail' && selectedAthlete ? openCoachPlan(selectedAthlete) : setModal('select-athlete')}><Icon name="plus" size={17} /><span className="desktop-cta-label">Training toevoegen</span><span className="mobile-cta-label">Training</span></button>}
+            {!demoMode && <form action="/auth/signout" method="post"><button className="icon-quiet" aria-label="Uitloggen" title="Uitloggen"><Icon name="logout" size={17} /></button></form>}
           </div>
         </header>
 
         <div className="page-content">
           {demoMode && <div className="preview-banner"><span className="preview-dot" /><span><strong>Voorbeeldomgeving</strong> · demo-gegevens worden alleen in deze browser bewaard.</span><button onClick={() => { window.localStorage.removeItem('marathon-coach-preview-v1'); window.location.reload() }}>Voorbeeld resetten</button></div>}
-          <div className="page-heading"><div><p className="eyebrow">{role === 'coach' ? 'COACHRUIMTE' : 'ATLEETRUIMTE'} <span className="eyebrow-line" /></p><h1>{title}</h1><p className="page-subtitle">{view === 'week' ? 'Een duidelijk overzicht van je trainingen en herstel.' : view === 'coach' ? 'Houd zicht op het trainingsproces van je atleten.' : view === 'plan' ? 'Je schema is een richtlijn. Pas de belasting aan op je reactie.' : view === 'history' ? 'Bekijk je looptrainingen, handmatig, via bestand of vanuit Strava.' : view === 'wellness' ? 'Deel alleen wat je zelf wilt. Invullen is altijd vrijblijvend.' : view === 'profile' ? 'Je instellingen bepalen hoe je plan wordt opgebouwd.' : view === 'suggestions' ? 'Voorstellen veranderen je schema pas na jouw beoordeling.' : 'Praktische informatie voor jouw begeleiding.'}</p></div><button className="date-chip"><Icon name="clock" size={16} /> {new Intl.DateTimeFormat('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date())}</button></div>
+          <div className="page-heading"><div>{role === 'coach' && <p className="eyebrow">COACHRUIMTE <span className="eyebrow-line" /></p>}<h1>{title}</h1><p className="page-subtitle">{view === 'week' ? 'Een duidelijk overzicht van je trainingen en herstel.' : view === 'coach' ? 'Houd zicht op het trainingsproces van je atleten.' : view === 'plan' ? 'Je schema is een richtlijn. Pas de belasting aan op je reactie.' : view === 'history' ? 'Bekijk je looptrainingen, handmatig, via bestand of vanuit Strava.' : view === 'wellness' ? 'Korte check-in voor slaap, rusthartslag en herstelgevoel.' : view === 'profile' ? 'Je instellingen bepalen hoe je plan wordt opgebouwd.' : view === 'suggestions' ? 'Voorstellen veranderen je schema pas na jouw beoordeling.' : 'Praktische informatie voor jouw begeleiding.'}</p></div><button className="date-chip"><Icon name="clock" size={16} /> {new Intl.DateTimeFormat('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date())}</button></div>
+          {view !== 'week' && <div className={'tab-photo-banner photo-' + view} aria-hidden="true" />}
 
           {view === 'week' && <>
             {plan && activeWeek ? <>
@@ -825,6 +847,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
         {activityUploadError && <div className="activity-upload-error full" role="alert">{activityUploadError}</div>}
         <div className="modal-actions full"><button type="button" className="button button-outline" onClick={() => setModal(null)} disabled={savingWorkoutFeedback}>Annuleren</button><button className="button button-primary" disabled={savingWorkoutFeedback}>{savingWorkoutFeedback ? 'Opslaan…' : selectedStravaCandidateId ? feedbackLinkedActivity ? 'Strava koppelen en huidige activiteit vervangen' : 'Afronden en Strava-activiteit koppelen' : feedbackWorkout.status === 'completed' ? activityFile ? 'Feedback en bestand opslaan' : 'Feedback opslaan' : activityFile ? 'Afronden en bestand uploaden' : 'Training afronden'}</button></div>
       </form></Modal>}
+      {modal === 'select-athlete' && <Modal title="Training toevoegen" subtitle="Kies een atleet om de trainingsplanning in te stellen of bij te werken." onClose={() => setModal(null)}><div className="athlete-picker-list">{data.athletes.length ? data.athletes.map((athlete) => <button type="button" className="athlete-picker-option" key={athlete.id} onClick={() => openCoachPlan(athlete)}><span className="athlete-avatar">{athlete.name.split(' ').map((part) => part[0]).slice(0, 2).join('')}</span><span><strong>{athlete.name}</strong><small>{athlete.email || 'Geen e-mailadres bekend'}</small></span><Icon name="arrow" size={17} /></button>) : <div className="empty-small"><strong>Je hebt nog geen atleten</strong><span>Nodig eerst een atleet uit om een trainingsplan te maken.</span><button type="button" className="button button-primary button-small" onClick={() => setModal('invite')}>Atleet uitnodigen</button></div>}</div></Modal>}
       {modal === 'invite' && <Modal title="Atleet uitnodigen" subtitle="De atleet krijgt een e-mail om een eigen account te maken." onClose={() => setModal(null)}><form className="form-grid" onSubmit={inviteAthlete}><label className="field full"><span>Naam</span><input name="name" placeholder="Naam van de atleet" /></label><label className="field full"><span>E-mailadres *</span><input name="email" type="email" required placeholder="naam@voorbeeld.nl" /></label><div className="invite-note full"><Icon name="shield" size={18} /><span>Iedere atleet ziet alleen het eigen profiel en de eigen trainingsgegevens.</span></div><div className="modal-actions full"><button type="button" className="button button-outline" onClick={() => setModal(null)}>Annuleren</button><button className="button button-primary">Uitnodiging versturen</button></div></form></Modal>}
       {modal === 'plan' && selectedAthlete && <Modal title="Marathonplan instellen" subtitle={'Maak een persoonlijk schema voor ' + selectedAthlete.name + '.'} onClose={() => setModal(null)}><form className="form-grid" onSubmit={saveCoachPlan}>
         <label className="field"><span>Marathondatum</span><input type="date" min={todayDateISO()} required value={coachPlanDraft.marathonDate} onChange={(event) => setCoachPlanDraft({ ...coachPlanDraft, marathonDate: event.target.value })} /></label>
@@ -843,7 +866,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
 }
 
 function WorkoutCard({ workout, activity, expanded, onExpand, onDone, onSkip }: { workout: PlanWeek['workouts'][number]; activity?: RunActivity; expanded: boolean; onExpand: () => void; onDone: () => void; onSkip: () => void }) {
-  const icon = workout.type === 'long' || workout.type === 'race' ? 'run' : workout.type === 'quality' ? 'spark' : 'clock'
+  const icon = workoutIconName(workout.type)
   const canAddFeedback = workout.status === 'completed'
   return (
     <article className={'workout-card' + (expanded ? ' expanded' : '') + (workout.optional ? ' optional-card' : '')}>
@@ -902,7 +925,7 @@ function PlanView({ plan, activities, onWorkout, expandedWorkout, onEnterWorkout
                 const canEnterNow = workout.date <= today && workout.status !== 'completed'
                 return <div className="plan-workout-entry" key={workout.id}>
                   <div className="plan-row">
-                    <div><span className="plan-row-date">{dateLabel(workout.date)}</span><strong>{workoutTitleLabel(workout.title)}{workout.optional && <small className="optional-tag">Optioneel</small>}</strong></div>
+                    <div className="plan-row-main"><span className={'workout-type-icon type-' + workout.type}><Icon name={workoutIconName(workout.type)} size={16} /></span><span className="plan-row-copy"><span className="plan-row-date">{dateLabel(workout.date)}</span><strong>{workoutTitleLabel(workout.title)}{workout.optional && <small className="optional-tag">Optioneel</small>}</strong></span></div>
                     <span className="plan-row-duration">{workout.durationMinutes ? workout.durationMinutes + ' min' : workout.distanceKm + ' km'}</span>
                     <StatusPill status={workout.status} />
                     <button className="icon-quiet" aria-label="Trainingdetails tonen" onClick={() => onWorkout(expandedWorkout === workout.id ? null : workout.id)}><Icon name="arrow" size={16} /></button>
@@ -950,8 +973,8 @@ function HistoryView({ activities, workouts, onEditWorkout, onAdd }: { activitie
   const items = [...activities].sort((a, b) => b.startedAt.localeCompare(a.startedAt))
   return <section className="history-page"><div className="history-toolbar"><div className="filter-chip active">Laatste 30 dagen</div><button className="button button-outline button-small" onClick={onAdd}><Icon name="plus" size={15} /> Handmatig toevoegen</button></div>{items.length ? <div className="history-list">{items.map((activity) => {
     const linkedWorkout = activity.plannedWorkoutId ? workouts.find((workout) => workout.id === activity.plannedWorkoutId) : undefined
-    return <article className="history-card" key={activity.id}><div className="history-date"><strong>{dateLabel(activity.startedAt, { day: 'numeric' })}</strong><span>{dateLabel(activity.startedAt, { month: 'short' })}</span></div><div className="history-activity-icon"><Icon name="run" size={18} /></div><div className="history-main"><div className="history-title-row"><h3>{activity.name}</h3><span className={'source-pill source-' + activity.source}>{activity.source === 'strava' ? <><Icon name="link" size={13} /> Strava</> : activitySourceLabel(activity.source)}</span></div><div className="history-meta"><span>{activity.distanceKm ? activity.distanceKm.toFixed(1).replace('.', ',') + ' km' : 'Afstand niet ingevuld'}</span><span>{activity.durationMinutes} min</span>{activity.pace && <span>{activity.pace} /km</span>}{activity.averageHeartRate && <span>{activity.averageHeartRate} bpm gem.</span>}</div>{activity.effort && <p className="history-feedback"><span>Gevoel</span>{effortLabel(activity.effort)}</p>}{activity.note && <p className="history-note">{activity.note}</p>}{activity.laps && activity.laps.length > 0 && <ActivityLapDetails laps={activity.laps} />}{linkedWorkout && <div className="history-entry-actions"><button type="button" className="button button-outline button-small" onClick={() => onEditWorkout(linkedWorkout.id)}>{linkedWorkout.status === 'completed' ? linkedWorkout.feedback ? 'Feedback aanpassen' : 'Feedback toevoegen' : linkedWorkout.status === 'skipped' ? 'Training alsnog invullen' : 'Training afronden'}</button></div>}</div><span className={'history-link-status ' + (activity.plannedWorkoutId ? 'linked' : 'unlinked')}>{activity.plannedWorkoutId ? 'Gekoppeld' : 'Losse activiteit'}</span></article>
-  })}</div> : <div className="empty-state"><div className="empty-plan-mark"><Icon name="history" size={24} /></div><h3>Nog geen trainingen</h3><p>Voeg na je training kort de belangrijkste gegevens toe.</p><button className="button button-primary button-small" onClick={onAdd}><Icon name="plus" size={15} /> Training toevoegen</button></div>}</section>
+    return <article className="history-card" key={activity.id}><div className="history-date"><strong>{dateLabel(activity.startedAt, { day: 'numeric' })}</strong><span>{dateLabel(activity.startedAt, { month: 'short' })}</span></div><div className={'history-activity-icon' + (linkedWorkout ? ' type-' + linkedWorkout.type : '')}><Icon name={linkedWorkout ? workoutIconName(linkedWorkout.type) : 'run'} size={18} /></div><div className="history-main"><div className="history-title-row"><h3>{activity.name}</h3><span className={'source-pill source-' + activity.source}>{activity.source === 'strava' ? <><Icon name="link" size={13} /> Strava</> : activitySourceLabel(activity.source)}</span></div><div className="history-meta"><span>{activity.distanceKm ? activity.distanceKm.toFixed(1).replace('.', ',') + ' km' : 'Afstand niet ingevuld'}</span><span>{activity.durationMinutes} min</span>{activity.pace && <span>{activity.pace} /km</span>}{activity.averageHeartRate && <span>{activity.averageHeartRate} bpm gem.</span>}</div>{activity.effort && <p className="history-feedback"><span>Gevoel</span>{effortLabel(activity.effort)}</p>}{activity.note && <p className="history-note">{activity.note}</p>}{activity.laps && activity.laps.length > 0 && <ActivityLapDetails laps={activity.laps} />}{linkedWorkout && <div className="history-entry-actions"><button type="button" className="button button-outline button-small" onClick={() => onEditWorkout(linkedWorkout.id)}>{linkedWorkout.status === 'completed' ? linkedWorkout.feedback ? 'Feedback aanpassen' : 'Feedback toevoegen' : linkedWorkout.status === 'skipped' ? 'Training alsnog invullen' : 'Training afronden'}</button></div>}</div><span className={'history-link-status ' + (activity.plannedWorkoutId ? 'linked' : 'unlinked')}>{activity.plannedWorkoutId ? 'Gekoppeld' : 'Losse activiteit'}</span></article>
+  })}</div> : <div className="empty-state"><div className="empty-plan-mark"><Icon name="history" size={24} /></div><h3>Nog geen trainingen</h3><p>Voeg na je training kort de belangrijkste gegevens toe.</p><button className="button button-primary button-small" onClick={onAdd}><Icon name="plus" size={15} /> Handmatig toevoegen</button></div>}</section>
 }
 
 function TrainingDaysControl({ draft, setDraft }: { draft: ProfileDraft; setDraft: React.Dispatch<React.SetStateAction<ProfileDraft>> }) {
@@ -1017,18 +1040,17 @@ function WellnessView({ wellness, todayWellness, draft, setDraft, onSubmit }: { 
     <div className="wellness-layout">
       <section className="wellness-form-card">
         <div className="section-heading">
-          <div><p className="eyebrow">VRIJBLIJVEND</p><h2>Hoe is je herstel?</h2></div>
+          <div><h2>Hoe is je herstel?</h2></div>
           <span className="wellness-icon-large"><Icon name="heart" size={22} /></span>
         </div>
-        <p className="muted">Vul alleen in wat je wilt delen. De velden zijn niet verplicht en er komen geen meldingen als je niets invult.</p>
         <div className="wellness-form-date"><Icon name="clock" size={16} /><span>Datum van invoer: <strong>{dateLabel(entryDate, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</strong>. Deze datum wordt bij opslaan vastgelegd.</span></div>
         <form onSubmit={onSubmit} className="wellness-form">
           <label className="field"><span>Slaapduur <small>uur</small></span><input type="number" min="0" max="24" step="0.25" value={draft.sleepHours} onChange={(event) => setDraft({ ...draft, sleepHours: event.target.value })} placeholder="Bijv. 7,5" /></label>
           <label className="field"><span>Rusthartslag <small>bpm</small></span><input type="number" min="25" max="220" value={draft.restingHeartRate} onChange={(event) => setDraft({ ...draft, restingHeartRate: event.target.value })} placeholder="Bijv. 54" /></label>
-          <div className="field full"><span>Herstelgevoel</span><div className="recovery-select">{[1, 2, 3, 4, 5].map((value) => <button type="button" key={value} aria-pressed={draft.recoveryScore === String(value)} className={draft.recoveryScore === String(value) ? 'selected' : ''} onClick={() => setDraft({ ...draft, recoveryScore: draft.recoveryScore === String(value) ? '' : String(value) })}><span>{value}</span><small>{['Slecht', 'Matig', 'Neutraal', 'Goed', 'Heel goed'][value - 1]}</small></button>)}</div></div>
+          <div className="field full"><span>Herstelgevoel</span><div className="recovery-select">{RECOVERY_LABELS.map((label, index) => { const value = index + 1; return <button type="button" key={value} aria-label={'Herstelgevoel: ' + label} aria-pressed={draft.recoveryScore === String(value)} className={'mood-' + value + (draft.recoveryScore === String(value) ? ' selected' : '')} onClick={() => setDraft({ ...draft, recoveryScore: draft.recoveryScore === String(value) ? '' : String(value) })}><span className="recovery-icon"><Icon name={'mood' + value} size={22} /></span><small>{label}</small></button> })}</div></div>
           <label className="field full"><span>Korte opmerking <small>optioneel</small></span><textarea rows={3} value={draft.note} onChange={(event) => setDraft({ ...draft, note: event.target.value })} placeholder="Bijvoorbeeld: drukke werkweek, voelde me fris tijdens het lopen" /></label>
           <label className="privacy-toggle full"><input type="checkbox" checked={draft.visibleToCoach} onChange={(event) => setDraft({ ...draft, visibleToCoach: event.target.checked })} /><span><strong>Deel deze gegevens met mijn coach</strong><small>Deze optie staat standaard uit. Je kunt dit per invoer aanpassen.</small></span><Icon name="shield" size={18} /></label>
-          <div className="form-actions full"><button className="button button-primary">Opslaan</button><span>Alle velden zijn optioneel.</span></div>
+          <div className="form-actions full"><button className="button button-primary">Opslaan</button></div>
         </form>
       </section>
       <aside className="wellness-side">
@@ -1043,12 +1065,12 @@ function WellnessView({ wellness, todayWellness, draft, setDraft, onSubmit }: { 
             <strong>{dateLabel(todayWellness.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</strong>
             <span>{todayWellness.sleepHours ? todayWellness.sleepHours + ' uur slaap' : 'Slaap niet ingevuld'}</span>
             {todayWellness.restingHeartRate ? <span>{todayWellness.restingHeartRate} bpm rusthartslag</span> : null}
-            {todayWellness.recoveryScore ? <div className="wellness-entry-score"><EffortDots value={todayWellness.recoveryScore} /><small>herstelgevoel</small></div> : null}
+            {todayWellness.recoveryScore ? <div className="wellness-entry-score"><RecoveryMood value={todayWellness.recoveryScore} /></div> : null}
           </div> : <p className="muted">Je hebt vandaag nog niets ingevuld.</p>}
           {wellness.filter((entry) => entry.date !== todayWellness?.date).slice(0, 4).map((entry) => (
             <div className="wellness-entry compact" key={entry.id}>
               <strong>{dateLabel(entry.date, { day: 'numeric', month: 'short', year: 'numeric' })}</strong>
-              <span>{entry.recoveryScore ? 'Herstelgevoel ' + entry.recoveryScore + '/5' : entry.sleepHours ? entry.sleepHours + ' uur slaap' : 'Invoer opgeslagen'}</span>
+              <span>{entry.recoveryScore ? <RecoveryMood value={entry.recoveryScore} size={15} /> : entry.sleepHours ? entry.sleepHours + ' uur slaap' : 'Invoer opgeslagen'}</span>
             </div>
           ))}
         </div>
@@ -1097,8 +1119,8 @@ function ProfileView({ data, draft, setDraft, paces, onSubmit, onConnect, onSync
           <small>Je Strava-wachtwoord wordt nooit opgeslagen.</small>
         </div>
         <div className="profile-help"><span className="aside-icon lime"><Icon name="spark" /></span><h3>Praattempo</h3><p>Gebruik je ademhaling naast tempo en hartslag om je inspanning in te schatten.</p><TalkTestGuide /><small className="talk-test-note">Een praktische richtlijn; wind, warmte en vermoeidheid tellen ook mee.</small></div>
-        <details className="zone-reference"><summary><span><strong>Hartslagzones</strong><small>Open voor uitleg bij de zone-indeling</small></span><Icon name="chevron" size={18} /></summary><div className="zone-reference-list"><div><b>Z1</b><span><strong>Rustig</strong><small>&lt;75% · makkelijk praten</small></span></div><div><b>Z2</b><span><strong>Gecontroleerd</strong><small>75–82% · zinnen worden korter</small></span></div><div><b>Z3</b><span><strong>Vlot / drempel</strong><small>82–88% · korte zinnen</small></span></div><div><b>Z4</b><span><strong>Intensief</strong><small>89–92% · enkele woorden</small></span></div><div><b>Z5</b><span><strong>Korte versnelling</strong><small>&gt;92% · zwaar hijgen</small></span></div></div><p className="zone-note">Percentages zijn een richtlijn op basis van maximale hartslag. Gebruik ook je ademhaling en ervaren inspanning; hartslag hoeft niet ingevuld te zijn.</p><a className="zone-source" href="https://all4running.nl/blog/app/uploads/2025/05/HardloopschemaMarathonGevorderd.pdf" target="_blank" rel="noreferrer">Bekijk de bron van deze zone-indeling <span>↗</span></a></details>
-        <details className="zone-reference pace-reference"><summary><span><strong>Tempozones</strong><small>Open voor jouw tempo-indicaties</small></span><Icon name="chevron" size={18} /></summary><div className="pace-preview"><div><span className="small-label">TEMPO-INDICATIES</span><span className="pace-preview-note">Richtlijnen op basis van je recente wedstrijd en marathondoel. Zie ze als startpunt; pas aan op gevoel en omstandigheden.</span></div>{paces ? <div className="pace-preview-grid"><span><small>Rustige duur</small><b>{formatPace(paces.easy[0])}–{formatPace(paces.easy[1])} /km</b></span><span><small>Marathontempo</small><b>{formatPace(paces.marathon)} /km</b></span><span><small>Drempeltempo</small><b>{formatPace(paces.threshold[0])}–{formatPace(paces.threshold[1])} /km</b></span><span><small>Intervaltempo</small><b>{formatPace(paces.interval[0])}–{formatPace(paces.interval[1])} /km</b></span></div> : <p className="muted">Vul links een recente wedstrijdafstand en -tijd in, bijvoorbeeld 10 km in 50:00.</p>}</div></details>
+        <details className="zone-reference"><summary><span><strong>Hartslagzones</strong><small>Open voor uitleg bij de zone-indeling</small></span><Icon name="chevron" size={18} /></summary><div className="zone-reference-list"><div><b>Z1</b><span><strong>Rustig</strong><small>&lt;75% · makkelijk praten</small></span></div><div><b>Z2</b><span><strong>Gecontroleerd</strong><small>75–82% · zinnen worden korter</small></span></div><div><b>Z3</b><span><strong>Vlot / stevig</strong><small>82–88% · korte zinnen</small></span></div><div><b>Z4</b><span><strong>Intensief</strong><small>89–92% · enkele woorden</small></span></div><div><b>Z5</b><span><strong>Korte versnelling</strong><small>&gt;92% · zwaar hijgen</small></span></div></div><p className="zone-note">Percentages zijn een richtlijn op basis van maximale hartslag. Gebruik ook je ademhaling en ervaren inspanning; hartslag hoeft niet ingevuld te zijn.</p><a className="zone-source" href="https://all4running.nl/blog/app/uploads/2025/05/HardloopschemaMarathonGevorderd.pdf" target="_blank" rel="noreferrer">Bekijk de bron van deze zone-indeling <span>↗</span></a></details>
+        <details className="zone-reference pace-reference"><summary><span><strong>Tempozones</strong><small>Open voor jouw tempo-indicaties</small></span><Icon name="chevron" size={18} /></summary><div className="pace-preview"><div><span className="small-label">TEMPO-INDICATIES</span><span className="pace-preview-note">Richtlijnen op basis van je recente wedstrijd en marathondoel. Zie ze als startpunt; pas aan op gevoel en omstandigheden.</span></div>{paces ? <div className="pace-preview-grid"><span><small>Rustige duur</small><b>{formatPace(paces.easy[0])}–{formatPace(paces.easy[1])} /km</b></span><span><small>Marathontempo</small><b>{formatPace(paces.marathon)} /km</b></span><span><small>Stevig tempo</small><b>{formatPace(paces.threshold[0])}–{formatPace(paces.threshold[1])} /km</b></span><span><small>Intervaltempo</small><b>{formatPace(paces.interval[0])}–{formatPace(paces.interval[1])} /km</b></span></div> : <p className="muted">Vul links een recente wedstrijdafstand en -tijd in, bijvoorbeeld 10 km in 50:00.</p>}</div></details>
         <div className="profile-footnote"><Icon name="shield" size={16} /><span>Je account en trainingsgegevens zijn alleen zichtbaar volgens de coach-atleettoewijzing.</span></div>
       </aside>
     </div>
@@ -1156,14 +1178,14 @@ function AthleteDetail({ athlete, data, onBack, onSetupPlan, onAddNote }: { athl
     </div>
     {athlete.reason && <div className="attention-note"><Icon name="spark" size={18} /><span><strong>Coachcontext</strong>{athlete.reason}</span></div>}
     {(athlete.recentWeeklyKm || athlete.recentLongestRunKm) && <div className="attention-note training-baseline"><Icon name="run" size={18} /><span><strong>Recente trainingsbasis</strong>{athlete.recentWeeklyKm ? athlete.recentWeeklyKm + ' km per week' : ''}{athlete.recentWeeklyKm && athlete.recentLongestRunKm ? ' · ' : ''}{athlete.recentLongestRunKm ? 'langste duurloop ' + athlete.recentLongestRunKm + ' km' : ''}. Gebruik dit als context bij de beoordeling van de startweken.</span></div>}
-    {athlete.wellness && athlete.wellness.length > 0 && <div className="shared-wellness"><strong>Gedeelde herstelgegevens</strong>{athlete.wellness.slice(0, 3).map((item) => <span key={item.id}>{dateLabel(item.date, { day: 'numeric', month: 'short' })}{item.sleepHours ? ' · ' + item.sleepHours + ' uur slaap' : ''}{item.restingHeartRate ? ' · ' + item.restingHeartRate + ' bpm rusthartslag' : ''}{item.recoveryScore ? ' · herstel ' + item.recoveryScore + '/5' : ''}</span>)}</div>}
+    {athlete.wellness && athlete.wellness.length > 0 && <div className="shared-wellness"><strong>Gedeelde herstelgegevens</strong>{athlete.wellness.slice(0, 3).map((item) => <span key={item.id}>{dateLabel(item.date, { day: 'numeric', month: 'short' })}{item.sleepHours ? ' · ' + item.sleepHours + ' uur slaap' : ''}{item.restingHeartRate ? ' · ' + item.restingHeartRate + ' bpm rusthartslag' : ''}{item.recoveryScore ? <span className="shared-wellness-recovery"> · <Icon name={'mood' + item.recoveryScore} size={14} /> {recoveryLabel(item.recoveryScore)}</span> : null}</span>)}</div>}
     {planWeeks.length > 0 && <section className="coach-plan-timeline">
       <div className="section-heading"><div><p className="eyebrow">PLANNING</p><h2>Volledig trainingsplan</h2></div></div>
       <div className="plan-week-list">{planWeeks.map((week) => {
         const completed = week.workouts.filter((workout) => workout.status === 'completed').length
         return <details className="plan-week" key={week.weekNumber} open={week.weekNumber === athlete.currentWeek}>
           <summary><span className="plan-week-number">{String(week.weekNumber).padStart(2, '0')}</span><span className="plan-week-copy"><strong>Week {week.weekNumber} · {phaseLabel(week.phase)}{week.isRecoveryWeek ? ' · Herstelweek' : ''}</strong><small>{week.goal}</small></span><span className="plan-week-count">{completed}/{week.workouts.length}<Icon name="chevron" size={16} /></span></summary>
-          <div className="plan-week-workouts">{week.workouts.map((workout) => <div key={workout.id}><div className="plan-row"><div><span className="plan-row-date">{dateLabel(workout.date)}</span><strong>{workoutTitleLabel(workout.title)}{workout.optional && <span className="optional-tag"> Optioneel</span>}</strong></div><span className="plan-row-duration">{workout.durationMinutes ? workout.durationMinutes + ' min' : workout.distanceKm + ' km'}</span><StatusPill status={workout.status} /></div><div className="plan-row-detail">{workout.goal}{workout.intensity ? ' · ' + paceIntensityLabel(workout.intensity) : ''}</div>{workout.feedback && <div className="coach-workout-feedback"><strong>Atleetfeedback</strong>{workout.feedback.effort && <span>{effortLabel(workout.feedback.effort)}</span>}{workout.feedback.note && <p>{workout.feedback.note}</p>}{workout.feedback.completedAt && <small>Ingevuld {dateLabel(workout.feedback.completedAt)}</small>}</div>}{recent.filter((activity) => activity.plannedWorkoutId === workout.id).slice(0, 1).map((activity) => <LinkedActivitySummary key={activity.id} activity={activity} />)}</div>)}</div>
+          <div className="plan-week-workouts">{week.workouts.map((workout) => <div key={workout.id}><div className="plan-row"><div className="plan-row-main"><span className={'workout-type-icon type-' + workout.type}><Icon name={workoutIconName(workout.type)} size={16} /></span><span className="plan-row-copy"><span className="plan-row-date">{dateLabel(workout.date)}</span><strong>{workoutTitleLabel(workout.title)}{workout.optional && <span className="optional-tag"> Optioneel</span>}</strong></span></div><span className="plan-row-duration">{workout.durationMinutes ? workout.durationMinutes + ' min' : workout.distanceKm + ' km'}</span><StatusPill status={workout.status} /></div><div className="plan-row-detail">{workout.goal}{workout.intensity ? ' · ' + paceIntensityLabel(workout.intensity) : ''}</div>{workout.feedback && <div className="coach-workout-feedback"><strong>Atleetfeedback</strong>{workout.feedback.effort && <span>{effortLabel(workout.feedback.effort)}</span>}{workout.feedback.note && <p>{workout.feedback.note}</p>}{workout.feedback.completedAt && <small>Ingevuld {dateLabel(workout.feedback.completedAt)}</small>}</div>}{recent.filter((activity) => activity.plannedWorkoutId === workout.id).slice(0, 1).map((activity) => <LinkedActivitySummary key={activity.id} activity={activity} />)}</div>)}</div>
         </details>
       })}</div>
     </section>}
@@ -1174,7 +1196,7 @@ function AthleteDetail({ athlete, data, onBack, onSetupPlan, onAddNote }: { athl
       {(athlete.coachNotes ?? []).length === 0 ? <p className="muted">Nog geen notities toegevoegd.</p> : (athlete.coachNotes ?? []).map((item) => <div className="wellness-entry" key={item.id}><strong>{dateLabel(item.createdAt, { day: 'numeric', month: 'long', year: 'numeric' })}</strong><span>{item.note}</span></div>)}
     </section>
     <div className="section-heading"><div><p className="eyebrow">LAATSTE 30 DAGEN</p><h2>Trainingsgeschiedenis</h2></div></div>
-    <div className="history-list compact-history">{recent.map((activity) => <div className="history-card" key={activity.id}><div className="history-activity-icon"><Icon name="run" size={18} /></div><div className="history-main"><div className="history-title-row"><h3>{activity.name}</h3><span className={'source-pill source-' + activity.source}>{activitySourceLabel(activity.source)}</span></div><div className="history-meta"><span>{dateLabel(activity.startedAt)}</span><span>{activity.distanceKm ? activity.distanceKm.toFixed(1).replace('.', ',') + ' km' : '—'}</span><span>{activity.durationMinutes} min</span>{activity.pace && <span>{activity.pace} /km</span>}</div>{activity.effort && <p className="history-feedback"><span>Gevoel</span>{effortLabel(activity.effort)}</p>}{activity.note && <p className="history-note">{activity.note}</p>}</div></div>)}</div>
+    <div className="history-list compact-history">{recent.map((activity) => { const linkedWorkout = activity.plannedWorkoutId ? planWeeks.flatMap((week) => week.workouts).find((workout) => workout.id === activity.plannedWorkoutId) : undefined; return <div className="history-card" key={activity.id}><div className={'history-activity-icon' + (linkedWorkout ? ' type-' + linkedWorkout.type : '')}><Icon name={linkedWorkout ? workoutIconName(linkedWorkout.type) : 'run'} size={18} /></div><div className="history-main"><div className="history-title-row"><h3>{activity.name}</h3><span className={'source-pill source-' + activity.source}>{activitySourceLabel(activity.source)}</span></div><div className="history-meta"><span>{dateLabel(activity.startedAt)}</span><span>{activity.distanceKm ? activity.distanceKm.toFixed(1).replace('.', ',') + ' km' : '—'}</span><span>{activity.durationMinutes} min</span>{activity.pace && <span>{activity.pace} /km</span>}</div>{activity.effort && <p className="history-feedback"><span>Gevoel</span>{effortLabel(activity.effort)}</p>}{activity.note && <p className="history-note">{activity.note}</p>}</div></div>})}</div>
     <p className="plan-disclaimer"><Icon name="shield" size={16} /> Herstelgegevens zijn alleen zichtbaar als de atleet deze met jou deelt.</p>
   </section>
 }

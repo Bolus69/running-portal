@@ -1,16 +1,16 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
 
 :root {
-  --ink: #17283A;
-  --ink-soft: #405266;
-  --muted: #5D6D7E;
-  --muted-light: #738294;
-  --paper: #F4F7FA;
+  --ink: #183247;
+  --ink-soft: #456176;
+  --muted: #63798B;
+  --muted-light: #8396A7;
+  --paper: #F2F6F9;
   --white: #fff;
-  --line: #E0E7EE;
-  --line-dark: #2D4058;
-  --forest: #14243A;
-  --forest-light: #203956;
+  --line: #DAE4EC;
+  --line-dark: #31516B;
+  --forest: #173A56;
+  --forest-light: #265472;
   --lime: #D5F36B;
   --lime-soft: #EFF8D7;
   --orange: #E98647;
@@ -18,7 +18,7 @@
   --lavender: #C1C9F2;
   --lavender-soft: #F1F2FC;
   --green: #337C54;
-  --shadow: 0 12px 30px rgba(20, 36, 58, .075);
+  --shadow: 0 12px 30px rgba(23, 58, 86, .09);
 }
 
 * { box-sizing: border-box; }
@@ -75,7 +75,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .button-primary { background: var(--lime); color: #1d2b1e; box-shadow: 0 2px 8px rgba(152, 191, 78, .14); }
 .button-primary:hover { background: #d4f788; box-shadow: 0 6px 14px rgba(152, 191, 78, .2); }
 .button-dark { background: var(--forest); color: white; }
-.button-dark:hover { background: #26382c; }
+.button-dark:hover { background: #214b68; }
 .button-outline { background: white; border-color: #dfe4dc; color: var(--ink); }
 .button-outline:hover { background: #f6f8f2; border-color: #cad3c7; }
 .button-soft { background: #f1f4ec; color: #54644e; }
@@ -309,15 +309,15 @@ h1, h2, h3 { font-family: 'Manrope', 'DM Sans', sans-serif; letter-spacing: -.6p
 
 /* Marathon Coach visual refresh: clearer contrast, calmer navy and lime, readable training zones. */
 body { font-size: 15px; line-height: 1.6; }
-.page-subtitle { color: #5D6D7E; font-size: 13px; line-height: 1.55; }
+.page-subtitle { color: var(--muted); font-size: 13px; line-height: 1.55; }
 .eyebrow, .sidebar-section-label, .small-label { color: #657587; font-size: 10px; letter-spacing: 1.05px; }
 .sidebar-section-label, .small-label { color: #A8B6C4; }
 .week-hero {
   min-height: 282px;
-  background: linear-gradient(100deg, rgba(20,36,58,.98) 0%, rgba(20,36,58,.9) 47%, rgba(20,36,58,.42) 100%),
+  background: linear-gradient(100deg, rgba(23,58,86,.97) 0%, rgba(23,58,86,.88) 47%, rgba(23,58,86,.4) 100%),
     url("https://images.unsplash.com/photo-1777788613992-5f2655a97e72?auto=format&fit=crop&w=1600&q=85") center 43% / cover no-repeat,
-    #14243A;
-  box-shadow: 0 18px 42px rgba(20,36,58,.18);
+    #173A56;
+  box-shadow: 0 18px 42px rgba(23,58,86,.19);
 }
 .week-hero-content { max-width: 650px; }
 .week-hero::after { display: none; }
@@ -335,8 +335,8 @@ body { font-size: 15px; line-height: 1.6; }
 .hero-photo-credit:hover { color: #fff; text-decoration: underline; text-underline-offset: 3px; }
 .week-hero .phase-pill { background: rgba(213,243,107,.17); border-color: rgba(213,243,107,.3); color: #E4F7B3; }
 .week-hero .week-ring { background: conic-gradient(var(--lime) var(--progress), rgba(255,255,255,.2) 0); }
-.workout-card { border-color: #DDE5EC; box-shadow: 0 5px 16px rgba(20,36,58,.035); }
-.workout-card:hover, .workout-card.expanded { border-color: #BCC9D5; box-shadow: 0 12px 28px rgba(20,36,58,.09); }
+.workout-card { border-color: #DDE5EC; box-shadow: 0 5px 16px rgba(23,58,86,.035); }
+.workout-card:hover, .workout-card.expanded { border-color: #BCC9D5; box-shadow: 0 12px 28px rgba(23,58,86,.09); }
 .workout-description { color: #58697B; font-size: 12px; line-height: 1.55; }
 .workout-meta { color: #4C5D70; font-size: 11px; line-height: 1.5; }
 .workout-title-row h3 { color: #17283A; font-size: 14px; }
@@ -357,14 +357,14 @@ body { font-size: 15px; line-height: 1.6; }
   vertical-align: 1px;
 }
 .button-primary { color: #152536; }
-.nav-item.active { background: #203956; }
-.mobile-nav button.active { color: #203956; background: #EFF8D7; }
+.nav-item.active { background: var(--forest-light); }
+.mobile-nav button.active { color: var(--forest-light); background: #EFF8D7; }
 .zone-reference {
   padding: 15px 16px;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: #fff;
-  box-shadow: 0 6px 18px rgba(20,36,58,.035);
+  box-shadow: 0 6px 18px rgba(23,58,86,.035);
 }
 .zone-reference summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .zone-reference summary::-webkit-details-marker { display: none; }
@@ -429,7 +429,7 @@ body { font-size: 15px; line-height: 1.6; }
 .training-baseline svg { flex: 0 0 auto; color: #4d713d; }
 .athlete-email { color: #596d80; font-size: .9em; font-weight: 500; overflow-wrap: anywhere; }
 .mobile-nav button { flex: 1 1 0; min-width: 0; min-height: 48px; font-size: 10px; color: #526477; }
-.mobile-nav button.active { color: #203956; }
+.mobile-nav button.active { color: var(--forest-light); }
 .stat-copy small, .athlete-row-main small, .athlete-row-progress, .linked-activity-summary small { color: #56697d; font-size: 10px; }
 .status-pill, .optional-tag, .plan-row-date, .history-date span { font-size: 9px; }
 .wellness-entry, .wellness-entry.compact, .wellness-entry-score small { color: #536477; font-size: 10px; }
@@ -444,3 +444,89 @@ body { font-size: 15px; line-height: 1.6; }
 .pace-reference .pace-preview { margin-top: 12px; padding: 0; border: 0; background: transparent; }
 .pace-reference .pace-preview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 @media (max-width: 900px) { .profile-side { grid-template-columns: minmax(0, 1fr); } }
+
+/* Warm blue visual system, consistent training symbols, and clearer page rhythm. */
+.page-heading h1 { color: var(--ink); line-height: 1.16; }
+.tab-photo-banner {
+  height: 146px;
+  margin: -7px 0 24px;
+  border: 1px solid rgba(255,255,255,.75);
+  border-radius: 16px;
+  background-color: #9cb2c0;
+  background-size: cover;
+  background-position: center 48%;
+  box-shadow: 0 10px 24px rgba(23,58,86,.1);
+  overflow: hidden;
+}
+.tab-photo-banner.photo-plan { background-image: linear-gradient(100deg, rgba(23,58,86,.48), rgba(23,58,86,.08)), url("https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?auto=format&fit=crop&w=1600&q=82"); background-position: center 54%; }
+.tab-photo-banner.photo-history { background-image: linear-gradient(100deg, rgba(23,58,86,.48), rgba(23,58,86,.08)), url("https://images.unsplash.com/photo-1552674605-db6ffd4facb5?auto=format&fit=crop&w=1600&q=82"); background-position: center 52%; }
+.tab-photo-banner.photo-wellness { background-image: linear-gradient(100deg, rgba(23,58,86,.5), rgba(23,58,86,.12)), url("https://images.unsplash.com/photo-1571008887538-b36bb32f4571?auto=format&fit=crop&w=1600&q=82"); background-position: center 44%; }
+.tab-photo-banner.photo-profile { background-image: linear-gradient(100deg, rgba(23,58,86,.5), rgba(23,58,86,.12)), url("https://images.unsplash.com/photo-1533561052604-c3beb6d55b8d?auto=format&fit=crop&w=1600&q=82"); background-position: center 50%; }
+.tab-photo-banner.photo-coach { background-image: linear-gradient(100deg, rgba(23,58,86,.52), rgba(23,58,86,.1)), url("https://images.unsplash.com/photo-1552674605-db6ffd4facb5?auto=format&fit=crop&w=1600&q=82"); background-position: center 40%; }
+.tab-photo-banner.photo-athletes { background-image: linear-gradient(100deg, rgba(23,58,86,.52), rgba(23,58,86,.1)), url("https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?auto=format&fit=crop&w=1600&q=82"); background-position: center 50%; }
+.tab-photo-banner.photo-suggestions { background-image: linear-gradient(100deg, rgba(23,58,86,.52), rgba(23,58,86,.1)), url("https://images.unsplash.com/photo-1571008887538-b36bb32f4571?auto=format&fit=crop&w=1600&q=82"); background-position: center 53%; }
+.tab-photo-banner.photo-athlete-detail { background-image: linear-gradient(100deg, rgba(23,58,86,.52), rgba(23,58,86,.1)), url("https://images.unsplash.com/photo-1533561052604-c3beb6d55b8d?auto=format&fit=crop&w=1600&q=82"); background-position: center 45%; }
+
+.workout-type-icon.type-easy, .history-activity-icon.type-easy { color: #2D6688; background: #E7F1F8; }
+.workout-type-icon.type-quality, .history-activity-icon.type-quality { color: #4E6592; background: #E9EDF7; }
+.workout-type-icon.type-long, .history-activity-icon.type-long { color: #39766F; background: #E7F3F0; }
+.workout-type-icon.type-optional, .history-activity-icon.type-optional { color: #68823B; background: #F0F5E1; }
+.workout-type-icon.type-race, .history-activity-icon.type-race { color: #9A6E36; background: #FFF1DC; }
+.plan-row > .plan-row-main { display: flex; flex-direction: row; align-items: center; gap: 10px; min-width: 175px; flex: 1; }
+.plan-row-main .workout-type-icon { width: 30px; height: 30px; border-radius: 9px; }
+.plan-row-copy { display: flex; flex-direction: column; min-width: 0; }
+.plan-row-copy strong { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; color: var(--ink); font-size: 13px; line-height: 1.35; }
+.plan-row-copy .plan-row-date { color: var(--muted); font-size: 10px; }
+.plan-row-detail { color: var(--ink-soft); font-size: 12px; line-height: 1.55; }
+.plan-row-detail div { color: var(--muted); font-size: 11px; }
+.plan-week-copy strong { color: var(--ink); font-size: 14px; }
+.plan-week-copy small { color: var(--muted); font-size: 12px; line-height: 1.45; }
+.plan-week-count { color: var(--ink-soft); font-size: 11px; }
+.history-title-row h3 { color: var(--ink); font-size: 14px; line-height: 1.35; }
+.history-meta { color: var(--ink-soft); font-size: 11px; }
+.workout-description, .workout-detail > p, .next-card .muted, .strava-card > p, .profile-help > p { color: var(--ink-soft); }
+.coach-card strong { color: #fff; font-size: 13px; }
+.coach-card span { font-size: 10px; }
+.recovery-select button { min-height: 72px; justify-content: center; color: var(--ink-soft); }
+.recovery-select button .recovery-icon { display: grid; place-items: center; color: #738A9B; line-height: 1; }
+.recovery-select button small { color: var(--ink-soft); font-size: 10px; }
+.recovery-select button.selected { background: var(--lime-soft); border-color: #B8D57F; }
+.recovery-select button.selected .recovery-icon { color: var(--forest-light); }
+.recovery-mood { display: inline-flex; align-items: center; gap: 6px; color: var(--forest-light); vertical-align: middle; }
+.recovery-mood small { color: var(--ink-soft); font-size: 10px; }
+.wellness-entry-score { margin-top: 7px; }
+.shared-wellness-recovery { display: inline-flex; align-items: center; gap: 3px; color: var(--ink-soft); }
+.athlete-picker-list { display: grid; gap: 8px; }
+.athlete-picker-option { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); text-align: left; }
+.athlete-picker-option:hover, .athlete-picker-option:focus-visible { border-color: #93AEC2; background: #F4F8FB; }
+.athlete-picker-option > span:nth-child(2) { display: grid; gap: 3px; flex: 1; min-width: 0; }
+.athlete-picker-option strong { font-size: 13px; }
+.athlete-picker-option small { color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+.athlete-picker-option > svg { color: var(--forest-light); }
+.mobile-cta-label { display: none; }
+.field > span { font-size: 12px; }
+.field > span small { font-size: 11px; }
+.field input, .field select, .field textarea { color: var(--ink); font-size: 14px; }
+.status-pill, .optional-tag, .plan-row-date, .history-date span { font-size: 10px; }
+.wellness-entry, .wellness-entry.compact { font-size: 11px; }
+.wellness-entry strong { font-size: 12px; }
+.stat-copy > span, .stat-copy small, .athlete-row-main small, .athlete-row-progress { font-size: 11px; }
+
+@media (max-width: 620px) {
+  .coach-add-training .desktop-cta-label { display: none; }
+  .coach-add-training .mobile-cta-label { display: inline; max-width: none; }
+  .coach-add-training.button-compact span { max-width: none; overflow: visible; }
+  .tab-photo-banner { height: 108px; margin: -5px 0 18px; border-radius: 12px; }
+  .plan-row > .plan-row-main { min-width: 0; }
+  .plan-row-main .workout-type-icon { width: 27px; height: 27px; }
+  .plan-row-copy strong { font-size: 12px; }
+  .plan-row-detail { padding-left: 37px; font-size: 11px; }
+  .plan-week-copy strong { font-size: 12px; }
+  .plan-week-copy small { font-size: 11px; }
+  .history-title-row h3 { font-size: 13px; }
+  .history-meta { font-size: 10px; }
+  .recovery-select button { min-height: 67px; }
+  .recovery-select button .recovery-icon svg { width: 20px; height: 20px; }
+  .recovery-select button small { font-size: 9px; }
+  .field input, .field select, .field textarea { font-size: 14px; }
+}
