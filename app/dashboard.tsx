@@ -54,7 +54,7 @@ function PlanTimingNote({ draft }: { draft: ProfileDraft }) {
 
 function Icon({ name, size = 19 }: { name: string; size?: number }) {
   const common = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true as const }
-  const runnerMark = <g transform="scale(.5)"><circle cx="29.1" cy="9.8" r="3.3" fill="currentColor" stroke="none" /><path d="m26.1 15.1-4.4 8 7.2 3.5 5-7.5M22 19.5l-5.5-3.1-4.5 2.5M29 26.4l-8.5 5.5-3.1 6M29.2 26.6l6.5 5.7 4.2.7" stroke="currentColor" strokeWidth="3" /><path d="M7.5 41c9.6 3.5 22.9 3.7 33-.4" stroke="currentColor" strokeWidth="1.5" opacity=".55" /></g>
+  const runnerMark = <><circle cx="16" cy="4" r="2.1" fill="currentColor" stroke="none" /><path d="m13.8 7.3-2.4 3.9 3.7 2.1M13.8 7.3l3.1 1.8 3.4-1.6M13.8 7.3l-3.3-1-2.5 1.8M11.4 11.2l-3.3 3.7-4 1.4-1.5 2.3M15.1 13.3l3.4 2.3 2.6 3.2" stroke="currentColor" strokeWidth="2.2" /></>
   const paths: Record<string, React.ReactNode> = {
     week: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/><path d="m8 15 2 2 5-5"/></>,
     plan: <><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21z"/><path d="M4 5.5v15M8 7h8M8 11h7"/></>,
@@ -190,10 +190,6 @@ function TalkTestGuide() {
   </div>
 }
 
-function PaceStrip() {
-  return <div className="pace-strip"><span><i className="pace-dot easy" /><b>Rustig</b></span><span><i className="pace-dot marathon" /><b>Marathon</b></span><span><i className="pace-dot threshold" /><b>Stevig</b></span><span><i className="pace-dot interval" /><b>Interval</b></span></div>
-}
-
 function StatCard({ label, value, detail, icon, tone }: { label: string; value: string; detail: string; icon: string; tone?: string }) {
   return <div className="stat-card"><span className={'stat-icon ' + (tone ?? '')}><Icon name={icon} size={17} /></span><div className="stat-copy"><span>{label}</span><strong>{value}</strong><small>{detail}</small></div></div>
 }
@@ -214,8 +210,6 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
   const [selectedStravaCandidateId, setSelectedStravaCandidateId] = useState('')
   const [savingWorkoutFeedback, setSavingWorkoutFeedback] = useState(false)
   const [toast, setToast] = useState('')
-  const [accountMenuOpen, setAccountMenuOpen] = useState(false)
-  const accountMenuRef = useRef<HTMLDivElement>(null)
   const [evaluatingSuggestions, setEvaluatingSuggestions] = useState(false)
   const [syncingStrava, setSyncingStrava] = useState(false)
   const [expandedWorkout, setExpandedWorkout] = useState<string | null>(null)
@@ -268,22 +262,6 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
     const timer = window.setTimeout(() => setToast(''), 3200)
     return () => window.clearTimeout(timer)
   }, [toast])
-
-  useEffect(() => {
-    if (!accountMenuOpen) return
-    const closeOutside = (event: PointerEvent) => {
-      if (event.target instanceof Node && !accountMenuRef.current?.contains(event.target)) setAccountMenuOpen(false)
-    }
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setAccountMenuOpen(false)
-    }
-    document.addEventListener('pointerdown', closeOutside)
-    document.addEventListener('keydown', closeOnEscape)
-    return () => {
-      document.removeEventListener('pointerdown', closeOutside)
-      document.removeEventListener('keydown', closeOnEscape)
-    }
-  }, [accountMenuOpen])
 
   useEffect(() => {
     const url = new URL(window.location.href)
@@ -765,19 +743,11 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
           {navItems.map((item) => <NavItem key={item.id} icon={item.icon} label={item.label} active={view === item.id || (view === 'athlete-detail' && item.id === 'athletes')} onClick={() => go(item.id)} />)}
         </nav>
         <div className="sidebar-bottom">
-          <div className="coach-card" ref={accountMenuRef}>
-            <div className="coach-avatar">{data.profile.name.charAt(0).toUpperCase()}</div>
-            <div><strong>{data.profile.name}</strong><span>{role === 'coach' ? BRAND.subtitle : 'Atleet'}</span></div>
-            <div className="account-menu-wrap">
-              <button type="button" aria-label="Accountmenu openen" aria-haspopup="menu" aria-expanded={accountMenuOpen} className="icon-quiet" onClick={() => setAccountMenuOpen((open) => !open)}><Icon name="more" /></button>
-              {accountMenuOpen && <div className="account-menu" role="menu" aria-label="Accountopties">
-                <button type="button" role="menuitem" onClick={() => { setAccountMenuOpen(false); go('profile') }}>Profiel en instellingen</button>
-                {demoMode
-                  ? <button type="button" role="menuitem" onClick={() => { window.localStorage.removeItem('marathon-coach-preview-v1'); window.location.reload() }}>Voorbeeld resetten</button>
-                  : null}
-              </div>}
-            </div>
-          </div>
+          <button type="button" className="coach-card" aria-label={'Profiel en instellingen voor ' + data.profile.name + ' openen'} onClick={() => { go('profile'); window.scrollTo({ top: 0, behavior: 'smooth' }) }}>
+            <span className="coach-avatar">{data.profile.name.charAt(0).toUpperCase()}</span>
+            <span className="coach-card-identity"><strong>{data.profile.name}</strong><span>{role === 'coach' ? 'Coach' : 'Atleet'}</span></span>
+            <Icon name="arrow" size={16} />
+          </button>
           <div className="side-brand-note"><LogoMark small /><span>Train met aandacht.<br />Loop met vertrouwen.</span></div>
         </div>
       </aside>
@@ -808,8 +778,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
 
               <div className="content-grid week-grid">
                 <section className="section-main"><div className="section-heading"><div><p className="eyebrow">JOUW PLANNING</p><h2>Deze week</h2></div><button className="text-button" onClick={() => go('plan')}>Hele schema <Icon name="arrow" size={16} /></button></div><div className="workout-list">{activeWeek.workouts.map((workout) => <WorkoutCard key={workout.id} workout={workout} activity={data.activities.find((activity) => activity.plannedWorkoutId === workout.id)} expanded={expandedWorkout === workout.id} onExpand={() => setExpandedWorkout(expandedWorkout === workout.id ? null : workout.id)} onDone={() => openWorkoutFeedback(workout)} onSkip={() => updateWorkout(workout.id, 'skipped')} />)}</div></section>
-                <aside className="section-aside"><div className="next-card"><div className="aside-card-head"><span className="aside-icon lime"><Icon name="spark" size={17} /></span><span className="small-label">VOLGENDE TRAINING</span></div>{nextTraining ? <><p className="next-date">{dateLabel(nextTraining.date)}</p><h3>{workoutTitleLabel(nextTraining.title)}</h3><p className="muted">{nextTraining.description}</p><div className="next-details"><span>{nextTraining.durationMinutes ? nextTraining.durationMinutes + ' min' : nextTraining.distanceKm + ' km'}</span><span>{paceIntensityLabel(nextTraining.intensity)}</span></div><button className="button button-dark full-width" onClick={() => { setExpandedWorkout(nextTraining.id); window.scrollTo({ top: 550, behavior: 'smooth' }) }}>Training bekijken <Icon name="arrow" size={16} /></button></> : <div className="empty-small"><strong>Alles gedaan</strong><span>Je trainingen voor deze week zijn afgerond.</span></div>}</div>
-                  <div className="pace-card"><div className="aside-card-head"><span className="aside-icon light"><Icon name="runner" size={17} /></span><span className="small-label">TRAININGSINTENSITEIT</span></div><p>Gebruik tempo als richtlijn. Je gevoel en de omstandigheden tellen mee.</p><PaceStrip /><button className="text-button" onClick={() => go('profile')}>Mijn tempozones <Icon name="arrow" size={16} /></button></div>
+                <aside className="section-aside"><div className="next-card"><div className="aside-card-head"><span className="aside-icon lime"><Icon name="spark" size={17} /></span><span className="small-label">VOLGENDE TRAINING</span></div>{nextTraining ? <><p className="next-date">{dateLabel(nextTraining.date)}</p><h3>{workoutTitleLabel(nextTraining.title)}</h3><p className="muted">{nextTraining.description}</p><div className="next-details"><span>{nextTraining.durationMinutes ? nextTraining.durationMinutes + ' min' : nextTraining.distanceKm + ' km'}</span><span>{paceIntensityLabel(nextTraining.intensity)}</span></div><button className="button button-dark full-width" onClick={() => { setExpandedWorkout(nextTraining.id); window.scrollTo({ top: 550, behavior: 'smooth' }) }}>Training bekijken <Icon name="arrow" size={16} /></button></> : <div className="empty-small"><strong>Alles gedaan</strong><span>Je trainingen voor deze week zijn afgerond.</span></div>}<button type="button" className="text-button next-zones-link" onClick={() => { go('profile'); window.scrollTo({ top: 0, behavior: 'smooth' }) }}>Praattempo en zones <Icon name="arrow" size={16} /></button></div>
                   <div className="wellness-nudge"><span className="wellness-nudge-icon"><Icon name="heart" /></span><div><strong>Hoe is je herstel?</strong><span>Alleen als je wilt delen.</span></div><button aria-label="Herstel invullen" onClick={() => go('wellness')}><Icon name="arrow" size={17} /></button></div>
                 </aside>
               </div>
