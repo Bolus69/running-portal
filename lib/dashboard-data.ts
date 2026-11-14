@@ -200,6 +200,7 @@ async function loadPlan(supabase: Awaited<ReturnType<typeof import('@/lib/supaba
     if (!weekWorkouts.length) return []
     return [{
       id: weekId,
+      historical: String(week.plan_id) !== planId,
       weekNumber: Number(week.week_number),
       phase: String(week.phase) as PlanWeek['phase'],
       goal: String(week.goal ?? ''),
