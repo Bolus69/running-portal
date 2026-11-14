@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { LogoMark } from '@/components/logo'
 import { BRAND } from '@/lib/brand'
-import { calculateTrainingPaces, currentWeekNumber, formatPace, generatePlan, getPlanStartDate, parseDurationToSeconds, phaseLabel } from '@/lib/training-plan'
+import { calculateTrainingPaces, currentWeekNumber, formatPace, generatePlan, getPlanStartDate, nextMondayDate, parseDurationToSeconds, phaseLabel } from '@/lib/training-plan'
 import { todayDateISO } from '@/lib/dates'
 import type { PlanWeek } from '@/lib/training-plan'
 import type { ActivityLap, AppRole, AthleteSummary, CoachNote, CoachSuggestion, DashboardData, RunActivity, WellnessEntry } from '@/lib/types'
@@ -28,7 +28,8 @@ function toggleProfileDay(setDraft: React.Dispatch<React.SetStateAction<ProfileD
   })
 }
 
-function PlanTimingNote({ draft }: { draft: ProfileDraft }) {
+function PlanTimingNote({ draft, revision = false, readOnly = false }: { draft: ProfileDraft; revision?: boolean; readOnly?: boolean }) {
+  if (revision) return <p className="plan-timing-note">Wijzigingen gaan in op maandag {dateLabel(nextMondayDate(), { day: 'numeric', month: 'long' })}. Eerdere trainingen en feedback blijven bewaard.</p>
   if (!draft.marathonDate) return <p className="plan-timing-note">Kies een marathondatum om de start van week 1 te zien.</p>
   if (draft.days.length !== 3) return <p className="plan-timing-note">Kies precies drie vaste dagen om de startdatum te berekenen.</p>
   let message: string
@@ -42,14 +43,14 @@ function PlanTimingNote({ draft }: { draft: ProfileDraft }) {
       optionalTrainingDay: draft.optionalTrainingDay,
     })
     isPast = start < todayDateISO()
-    message = isPast
+    message = isPast && !readOnly
       ? 'Dit schema zou starten op ' + dateLabel(start, { day: 'numeric', month: 'long', year: 'numeric' }) + ', in het verleden. Kies een korter schema of een latere marathondatum.'
       : 'Start van week 1: ' + dateLabel(start, { day: 'numeric', month: 'long', year: 'numeric' }) + '.'
   } catch (error) {
     isPast = true
     message = error instanceof Error ? error.message : 'Controleer de marathondatum en trainingsdagen.'
   }
-  return <p className={'plan-timing-note' + (isPast ? ' warning' : '')}>{message}</p>
+  return <p className={'plan-timing-note' + (isPast && !readOnly ? ' warning' : '')}>{message}</p>
 }
 
 function Icon({ name, size = 19 }: { name: string; size?: number }) {
@@ -122,7 +123,7 @@ function profileDraftForAthlete(athlete?: AthleteSummary): ProfileDraft {
     marathonDate: athlete?.marathonDate || todayDateISO(suggestedDate),
     goalTime: athlete?.goalTime || '04:00:00',
     planLength: athlete?.planLength ?? 16,
-    days: inferredDays.length === 3 ? inferredDays : athlete?.trainingDays ?? [2, 4, 0],
+    days: athlete?.trainingDays ?? (inferredDays.length === 3 ? inferredDays : [2, 4, 0]),
     optional: athlete?.includeOptionalFourth ?? Boolean(optionalWorkout),
     optionalTrainingDay: athlete?.optionalTrainingDay ?? (optionalWorkout ? new Date(optionalWorkout.date + 'T12:00:00').getDay() : 6),
     raceTime: raceTimeInput(athlete?.recentRaceTimeSeconds),
@@ -130,6 +131,33 @@ function profileDraftForAthlete(athlete?: AthleteSummary): ProfileDraft {
     recentWeeklyKm: athlete?.recentWeeklyKm ? String(athlete.recentWeeklyKm) : '',
     recentLongestRunKm: athlete?.recentLongestRunKm ? String(athlete.recentLongestRunKm) : '',
   }
+}
+
+function mergeRevisedPlanWeeks(previous: PlanWeek[], next: PlanWeek[], effectiveStartDate: string): PlanWeek[] {
+  const history = previous.map((week, index) => ({
+    ...week,
+    id: week.id ?? 'history-' + week.weekNumber + '-' + (week.workouts[0]?.date ?? index),
+    workouts: week.workouts.filter((workout) => workout.date < effectiveStartDate),
+  })).filter((week) => week.workouts.length > 0)
+  const upcoming = next.map((week) => ({
+    ...week,
+    id: 'current-' + week.weekNumber,
+    workouts: week.workouts.filter((workout) => workout.date >= effectiveStartDate),
+  })).filter((week) => week.workouts.length > 0)
+  return [...history, ...upcoming].sort((a, b) => (a.workouts[0]?.date ?? '').localeCompare(b.workouts[0]?.date ?? ''))
+}
+
+function findCurrentPlanWeek(weeks: PlanWeek[], todayDate = todayDateISO()): PlanWeek | undefined {
+  const monday = new Date(todayDate + 'T12:00:00.000Z')
+  const weekday = monday.getUTCDay()
+  monday.setUTCDate(monday.getUTCDate() - (weekday === 0 ? 6 : weekday - 1))
+  const mondayISO = monday.toISOString().slice(0, 10)
+  const sunday = new Date(monday)
+  sunday.setUTCDate(sunday.getUTCDate() + 6)
+  const sundayISO = sunday.toISOString().slice(0, 10)
+  return weeks.find((week) => week.workouts.some((workout) => workout.date >= mondayISO && workout.date <= sundayISO))
+    ?? weeks.find((week) => (week.workouts[0]?.date ?? '') >= todayDate)
+    ?? weeks[0]
 }
 
 function paceIntensityLabel(value?: string): string {
@@ -315,7 +343,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
   }, [])
 
   const plan = data.plan
-  const activeWeek = useMemo(() => plan?.weeks.find((week) => week.weekNumber === plan.currentWeek) ?? plan?.weeks[0] ?? null, [plan])
+  const activeWeek = useMemo(() => plan?.weeks.find((week) => week.id === plan.currentWeekId) ?? plan?.weeks.find((week) => week.weekNumber === plan.currentWeek) ?? plan?.weeks[0] ?? null, [plan])
   const completedThisWeek = activeWeek?.workouts.filter((workout) => workout.status === 'completed').length ?? 0
   const requiredThisWeek = activeWeek?.workouts.filter((workout) => !workout.optional).length ?? 0
   const progress = requiredThisWeek > 0 ? Math.round((completedThisWeek / requiredThisWeek) * 100) : 0
@@ -589,6 +617,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
     const goalSeconds = parseDurationToSeconds(coachPlanDraft.goalTime)
     if (!goalSeconds) return showToast('Gebruik voor de streeftijd uu:mm:ss, bijvoorbeeld 04:00:00.')
     if (coachPlanDraft.days.length !== 3) return showToast('Je hebt ' + coachPlanDraft.days.length + ' vaste dagen gekozen. Kies precies drie.')
+    const effectiveStartDate = selectedAthlete.planWeeks?.length ? nextMondayDate() : undefined
     let generatedWeeks: PlanWeek[]
     try {
       generatedWeeks = generatePlan({
@@ -598,10 +627,13 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
         includeOptionalFourth: coachPlanDraft.optional,
         optionalTrainingDay: coachPlanDraft.optionalTrainingDay,
         goalTimeSeconds: goalSeconds,
+        effectiveStartDate,
       })
     } catch (error) {
       return showToast(error instanceof Error ? error.message : 'Het plan kan niet worden opgebouwd.')
     }
+    const displayedWeeks = effectiveStartDate ? mergeRevisedPlanWeeks(selectedAthlete.planWeeks ?? [], generatedWeeks, effectiveStartDate) : generatedWeeks
+    const displayedCurrentWeek = findCurrentPlanWeek(displayedWeeks)
 
     if (!demoMode) {
       const response = await fetch('/api/plans', {
@@ -632,12 +664,11 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
       planLength: coachPlanDraft.planLength,
       recentWeeklyKm: coachPlanDraft.recentWeeklyKm ? Number(coachPlanDraft.recentWeeklyKm) : undefined,
       recentLongestRunKm: coachPlanDraft.recentLongestRunKm ? Number(coachPlanDraft.recentLongestRunKm) : undefined,
-      currentWeek: 1,
-      phase: 'Basis',
-      plannedThisWeek: 3,
-      completedThisWeek: 0,
-      lastLongRun: undefined,
-      planWeeks: generatedWeeks,
+      currentWeek: displayedCurrentWeek?.weekNumber ?? selectedAthlete.currentWeek,
+      phase: displayedCurrentWeek?.phase ?? selectedAthlete.phase,
+      plannedThisWeek: effectiveStartDate ? selectedAthlete.plannedThisWeek : displayedCurrentWeek?.workouts.filter((workout) => !workout.optional).length ?? 3,
+      lastLongRun: selectedAthlete.lastLongRun,
+      planWeeks: displayedWeeks,
     }
     setSelectedAthlete(updatedAthlete)
     setData((current) => ({
@@ -645,7 +676,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
       athletes: current.athletes.map((athlete) => athlete.id === updatedAthlete.id ? updatedAthlete : athlete),
     }))
     setModal(null)
-    showToast(demoMode ? 'Voorbeeldschema ingesteld.' : 'Marathonplan opgeslagen voor ' + selectedAthlete.name + '.')
+    showToast(effectiveStartDate ? 'Schema aangepast. Eerdere trainingen blijven bewaard; de wijziging gaat in op maandag ' + dateLabel(effectiveStartDate, { day: 'numeric', month: 'long' }) + '.' : demoMode ? 'Voorbeeldschema ingesteld.' : 'Marathonplan opgeslagen voor ' + selectedAthlete.name + '.')
     if (!demoMode) router.refresh()
   }
 
@@ -655,6 +686,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
     const goalSeconds = parseDurationToSeconds(profileDraft.goalTime)
     if (!goalSeconds) return showToast('Gebruik voor de streeftijd uu:mm:ss, bijvoorbeeld 04:00:00.')
     if (profileDraft.days.length !== 3) return showToast('Kies precies drie vaste trainingsdagen.')
+    const effectiveStartDate = profileAthlete.planWeeks?.length ? nextMondayDate() : undefined
     const recentWeeklyKm = profileDraft.recentWeeklyKm ? Number(profileDraft.recentWeeklyKm) : undefined
     const recentLongestRunKm = profileDraft.recentLongestRunKm ? Number(profileDraft.recentLongestRunKm) : undefined
     const recentRaceDistanceKm = profileDraft.raceDistance ? Number(profileDraft.raceDistance) : undefined
@@ -668,10 +700,14 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
         includeOptionalFourth: profileDraft.optional,
         optionalTrainingDay: profileDraft.optionalTrainingDay,
         goalTimeSeconds: goalSeconds,
+        effectiveStartDate,
       })
     } catch (error) {
       return showToast(error instanceof Error ? error.message : 'Het plan kan niet worden opgebouwd.')
     }
+    const displayedWeeks = effectiveStartDate ? mergeRevisedPlanWeeks(profileAthlete.planWeeks ?? [], weeks, effectiveStartDate) : weeks
+    const currentPlanWeek = findCurrentPlanWeek(displayedWeeks)
+    const currentWeek = currentPlanWeek?.weekNumber ?? currentWeekNumber(displayedWeeks)
     if (!demoMode) {
       const response = await fetch('/api/plans', {
         method: 'POST',
@@ -693,8 +729,6 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
       const result = await response.json().catch(() => ({})) as { error?: string }
       if (!response.ok) return showToast(result.error ?? 'Het atleetprofiel kon niet worden opgeslagen.')
     }
-    const currentWeek = currentWeekNumber(weeks)
-    const currentPlanWeek = weeks.find((week) => week.weekNumber === currentWeek)
     const updatedAthlete: AthleteSummary = {
       ...profileAthlete,
       marathonDate: profileDraft.marathonDate,
@@ -709,12 +743,11 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
       recentLongestRunKm,
       currentWeek,
       phase: currentPlanWeek?.phase ?? 'Basis',
-      plannedThisWeek: currentPlanWeek?.workouts.filter((workout) => !workout.optional).length ?? 0,
-      completedThisWeek: 0,
-      planWeeks: weeks,
+      plannedThisWeek: effectiveStartDate ? profileAthlete.plannedThisWeek : currentPlanWeek?.workouts.filter((workout) => !workout.optional).length ?? 0,
+      planWeeks: displayedWeeks,
     }
     setData((current) => ({ ...current, athletes: current.athletes.map((athlete) => athlete.id === updatedAthlete.id ? updatedAthlete : athlete) }))
-    showToast(demoMode ? 'Voorbeeldprofiel bijgewerkt voor ' + updatedAthlete.name + '.' : 'Atleetprofiel bijgewerkt voor ' + updatedAthlete.name + '.')
+    showToast(effectiveStartDate ? 'Atleetprofiel bijgewerkt. Eerdere trainingen blijven bewaard; de wijziging gaat in op maandag ' + dateLabel(effectiveStartDate, { day: 'numeric', month: 'long' }) + '.' : demoMode ? 'Voorbeeldprofiel bijgewerkt voor ' + updatedAthlete.name + '.' : 'Atleetprofiel bijgewerkt voor ' + updatedAthlete.name + '.')
     if (!demoMode) router.refresh()
   }
 
@@ -987,7 +1020,7 @@ function PlanView({ plan, activities, onWorkout, expandedWorkout, onEnterWorkout
       </div>
       <div className="plan-week-list">
         {plan.weeks.map((week) => (
-          <details className="plan-week" key={week.weekNumber} open={week.weekNumber === plan.currentWeek}>
+          <details className="plan-week" key={week.id ?? week.weekNumber} open={week.id === plan.currentWeekId || (!plan.currentWeekId && week.weekNumber === plan.currentWeek)}>
             <summary>
               <span className="plan-week-number">{String(week.weekNumber).padStart(2, '0')}</span>
               <span className="plan-week-copy"><strong>{phaseLabel(week.phase)}</strong><small>{week.goal}</small></span>
@@ -1052,7 +1085,7 @@ function HistoryView({ activities, workouts, onEditWorkout, onAdd }: { activitie
   })}</div> : <div className="empty-state"><div className="empty-plan-mark"><Icon name="history" size={24} /></div><h3>Nog geen trainingen</h3><p>Voeg na je training kort de belangrijkste gegevens toe.</p><button className="button button-primary button-small" onClick={onAdd}><Icon name="plus" size={15} /> Handmatig toevoegen</button></div>}</section>
 }
 
-function TrainingDaysControl({ draft, setDraft }: { draft: ProfileDraft; setDraft: React.Dispatch<React.SetStateAction<ProfileDraft>> }) {
+function TrainingDaysControl({ draft, setDraft, disabled = false }: { draft: ProfileDraft; setDraft: React.Dispatch<React.SetStateAction<ProfileDraft>>; disabled?: boolean }) {
   const availableOptionalDays = TRAINING_DAYS.filter((day) => !draft.days.includes(day.value))
 
   function toggleOptional(enabled: boolean) {
@@ -1075,6 +1108,7 @@ function TrainingDaysControl({ draft, setDraft }: { draft: ProfileDraft; setDraf
               key={day.value}
               aria-pressed={draft.days.includes(day.value)}
               className={draft.days.includes(day.value) ? 'selected' : ''}
+              disabled={disabled}
               onClick={() => toggleProfileDay(setDraft, day.value)}
             >
               {day.label}
@@ -1084,7 +1118,7 @@ function TrainingDaysControl({ draft, setDraft }: { draft: ProfileDraft; setDraf
         <small className="day-selection-hint">Selecteer of deselecteer dagen. Je kunt eerst een nieuwe dag kiezen en daarna een oude uitzetten; opslaan vraagt precies drie dagen.</small>
       </div>
       <label className="optional-setting full">
-        <input type="checkbox" checked={draft.optional} onChange={(event) => toggleOptional(event.target.checked)} />
+        <input type="checkbox" checked={draft.optional} disabled={disabled} onChange={(event) => toggleOptional(event.target.checked)} />
         <span><strong>Optionele vierde training beschikbaar</strong><small>Rustige herstelduurloop of korte techniektraining.</small></span>
       </label>
       {draft.optional && (
@@ -1097,6 +1131,7 @@ function TrainingDaysControl({ draft, setDraft }: { draft: ProfileDraft; setDraf
                 key={day.value}
                 aria-pressed={draft.optionalTrainingDay === day.value}
                 className={draft.optionalTrainingDay === day.value ? 'selected' : ''}
+                disabled={disabled}
                 onClick={() => setDraft((current) => ({ ...current, optionalTrainingDay: day.value }))}
               >
                 {day.label}
@@ -1155,9 +1190,10 @@ function WellnessView({ wellness, todayWellness, draft, setDraft, onSubmit }: { 
 }
 
 function ProfileView({ data, role, athletes, selectedAthlete, onSelectAthlete, draft, setDraft, paces, onSubmit, onConnect, onSync, syncingStrava, onDisconnect, demoMode }: { data: DashboardData; role: AppRole; athletes: AthleteSummary[]; selectedAthlete: AthleteSummary | null; onSelectAthlete: (id: string) => void; draft: ProfileDraft; setDraft: React.Dispatch<React.SetStateAction<ProfileDraft>>; paces: ReturnType<typeof calculateTrainingPaces>; onSubmit: (event: React.FormEvent<HTMLFormElement>) => void; onConnect: () => void; onSync: () => void; syncingStrava: boolean; onDisconnect: () => void; demoMode: boolean }) {
+  const planLocked = role !== 'coach' || !selectedAthlete
   return (
     <div className="profile-layout">
-      <form className="profile-form-card" onSubmit={onSubmit}>
+      <form className="profile-form-card" onSubmit={(event) => { event.preventDefault(); if (role === 'coach' && selectedAthlete) onSubmit(event) }}>
         <div className="section-heading">
           <div><p className="eyebrow">MARATHONINSTELLINGEN</p><h2>{role === 'coach' ? 'Atleetinstellingen' : 'Jouw startpunt'}</h2></div>
           <span className="profile-avatar">{(role === 'coach' ? selectedAthlete?.name : data.profile.name)?.charAt(0) ?? 'A'}</span>
@@ -1165,26 +1201,28 @@ function ProfileView({ data, role, athletes, selectedAthlete, onSelectAthlete, d
         {role === 'coach'
           ? <label className="field full"><span>Atleet</span><select aria-label="Atleet selecteren" required value={selectedAthlete?.id ?? ''} onChange={(event) => onSelectAthlete(event.target.value)}><option value="" disabled>Kies een atleet</option>{[...athletes].sort((a, b) => a.name.localeCompare(b.name, 'nl')).map((athlete) => <option key={athlete.id} value={athlete.id}>{athlete.name}{athlete.email ? ' (' + athlete.email + ')' : ''}</option>)}</select></label>
           : <label className="field full"><span>Naam</span><input value={data.profile.name} readOnly /></label>}
+        {role === 'athlete' ? <div className="profile-lock-notice" role="status"><Icon name="shield" size={17} /><span>{data.plan ? 'Je coach beheert deze marathoninstellingen. Je kunt ze hier bekijken en je trainingen en feedback blijven invullen. Bespreek aanpassingen met je coach.' : 'Je coach stelt je marathonplan samen. Zodra het klaarstaat, zie je de instellingen hier.'}</span></div> : selectedAthlete?.planWeeks?.length ? <div className="profile-lock-notice" role="status"><Icon name="clock" size={17} /><span>Nieuwe schema-aanpassingen gaan in op maandag {dateLabel(nextMondayDate(), { day: 'numeric', month: 'long' })}. Eerdere trainingen en feedback blijven bewaard.</span></div> : null}
+        {role === 'coach' && !selectedAthlete ? <p className="plan-timing-note">Selecteer een atleet om diens schema-instellingen te bekijken of aan te passen.</p> : null}
         <div className="form-row">
-          <label className="field"><span>Marathondatum</span><input type="date" min={todayDateISO()} required value={draft.marathonDate} onChange={(event) => setDraft({ ...draft, marathonDate: event.target.value })} /></label>
-          <label className="field"><span>Gewenste streeftijd <small>uu:mm:ss</small></span><input required pattern="\d{2}:\d{2}:\d{2}" value={draft.goalTime} onChange={(event) => setDraft({ ...draft, goalTime: event.target.value })} placeholder="04:00:00" /></label>
+          <label className="field"><span>Marathondatum</span><input type="date" min={todayDateISO()} required value={draft.marathonDate} disabled={planLocked} onChange={(event) => setDraft({ ...draft, marathonDate: event.target.value })} /></label>
+          <label className="field"><span>Gewenste streeftijd <small>uu:mm:ss</small></span><input required pattern="\d{2}:\d{2}:\d{2}" value={draft.goalTime} readOnly={planLocked} onChange={(event) => setDraft({ ...draft, goalTime: event.target.value })} placeholder="04:00:00" /></label>
         </div>
-        <PlanTimingNote draft={draft} />
+        <PlanTimingNote draft={draft} revision={role === 'coach' && Boolean(selectedAthlete?.planWeeks?.length)} readOnly={role === 'athlete'} />
         <div className="field full">
           <span>Planlengte</span>
-          <div className="plan-length-options">{([12, 16, 20] as const).map((length) => <button type="button" key={length} aria-pressed={draft.planLength === length} className={draft.planLength === length ? 'selected' : ''} onClick={() => setDraft({ ...draft, planLength: length })}><strong>{length}</strong><span>weken</span></button>)}</div>
+          <div className="plan-length-options">{([12, 16, 20] as const).map((length) => <button type="button" key={length} aria-pressed={draft.planLength === length} className={draft.planLength === length ? 'selected' : ''} onClick={() => setDraft({ ...draft, planLength: length })} disabled={planLocked}><strong>{length}</strong><span>weken</span></button>)}</div>
         </div>
-        <TrainingDaysControl draft={draft} setDraft={setDraft} />
+        <TrainingDaysControl draft={draft} setDraft={setDraft} disabled={planLocked} />
         <div className="field full">
           <span>Recente wedstrijd <small>voor een eerste tempo-indicatie · optioneel</small></span>
           <div className="form-row">
-            <label className="field"><span>Afstand <small>km</small></span><input type="number" min="1" step="0.1" aria-label="Wedstrijdafstand in kilometers" value={draft.raceDistance} onChange={(event) => setDraft({ ...draft, raceDistance: event.target.value })} placeholder="10" /></label>
-            <label className="field"><span>Tijd <small>min:sec of uu:mm:ss</small></span><input value={draft.raceTime} aria-label="Wedstrijdtijd" onChange={(event) => setDraft({ ...draft, raceTime: event.target.value })} placeholder="50:00" /></label>
+            <label className="field"><span>Afstand <small>km</small></span><input type="number" min="1" step="0.1" aria-label="Wedstrijdafstand in kilometers" value={draft.raceDistance} readOnly={planLocked} onChange={(event) => setDraft({ ...draft, raceDistance: event.target.value })} placeholder="10" /></label>
+            <label className="field"><span>Tijd <small>min:sec of uu:mm:ss</small></span><input value={draft.raceTime} aria-label="Wedstrijdtijd" readOnly={planLocked} onChange={(event) => setDraft({ ...draft, raceTime: event.target.value })} placeholder="50:00" /></label>
           </div>
           <small className="plan-context-hint">Bijvoorbeeld 10 km in 50:00. Gebruik bij voorkeur een recente wedstrijd of testloop.</small>
         </div>
-        <div className="field full"><span>Recente trainingsbasis <small>optioneel, afgelopen 4 weken</small></span><div className="form-row"><label className="field"><span>Gemiddelde weekomvang <small>km per week</small></span><input type="number" min="0.1" max="300" step="0.1" value={draft.recentWeeklyKm} onChange={(event) => setDraft({ ...draft, recentWeeklyKm: event.target.value })} placeholder="Bijv. 35" /></label><label className="field"><span>Langste duurloop <small>km</small></span><input type="number" min="0.1" max="100" step="0.1" value={draft.recentLongestRunKm} onChange={(event) => setDraft({ ...draft, recentLongestRunKm: event.target.value })} placeholder="Bijv. 18" /></label></div><small className="plan-context-hint">Deze gegevens helpen de startbelasting te beoordelen. Ze passen het schema zelf niet automatisch aan.</small></div>
-        <button className="button button-primary">{role === 'coach' ? 'Schema opslaan voor atleet' : 'Plan opslaan'} <Icon name="arrow" size={16} /></button>
+        <div className="field full"><span>Recente trainingsbasis <small>optioneel, afgelopen 4 weken</small></span><div className="form-row"><label className="field"><span>Gemiddelde weekomvang <small>km per week</small></span><input type="number" min="0.1" max="300" step="0.1" value={draft.recentWeeklyKm} readOnly={planLocked} onChange={(event) => setDraft({ ...draft, recentWeeklyKm: event.target.value })} placeholder="Bijv. 35" /></label><label className="field"><span>Langste duurloop <small>km</small></span><input type="number" min="0.1" max="100" step="0.1" value={draft.recentLongestRunKm} readOnly={planLocked} onChange={(event) => setDraft({ ...draft, recentLongestRunKm: event.target.value })} placeholder="Bijv. 18" /></label></div><small className="plan-context-hint">Deze gegevens helpen de startbelasting te beoordelen. Ze passen het schema zelf niet automatisch aan.</small></div>
+        {role === 'coach' && <button className="button button-primary" disabled={!selectedAthlete}>Schema opslaan voor atleet <Icon name="arrow" size={16} /></button>}
       </form>
       <aside className="profile-side">
         <div className="strava-card">
