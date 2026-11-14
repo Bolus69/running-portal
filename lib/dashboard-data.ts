@@ -98,16 +98,48 @@ async function loadActivities(supabase: Awaited<ReturnType<typeof import('@/lib/
 }
 
 async function loadPlan(supabase: Awaited<ReturnType<typeof import('@/lib/supabase/server').createServerSupabaseClient>>, athleteId: string) {
-  const { data: planData } = await supabase.from('training_plans').select('*').eq('athlete_id', athleteId).eq('status', 'active').order('created_at', { ascending: false }).limit(1).maybeSingle()
-  if (!planData) return null
-  const plan = planData as unknown as Row
+  const { data: planData } = await supabase.from('training_plans').select('*').eq('athlete_id', athleteId).order('created_at', { ascending: true })
+  const planRows = ((planData ?? []) as unknown as Row[])
+  let activePlanIndex = -1
+  for (let index = 0; index < planRows.length; index += 1) {
+    if (planRows[index].status === 'active') activePlanIndex = index
+  }
+  if (activePlanIndex < 0) return null
+
+  const plan = planRows[activePlanIndex]
   const planId = String(plan.id)
+  const effectiveStartDate = typeof plan.effective_start_date === 'string' ? plan.effective_start_date : undefined
+  const timelinePlans = effectiveStartDate
+    ? planRows.slice(0, activePlanIndex + 1).filter((item) => item.status === 'active' || item.status === 'paused')
+    : [plan]
+  const planIds = timelinePlans.map((item) => String(item.id))
+  const boundsByPlan = new Map<string, { from?: string; until?: string }>()
+  timelinePlans.forEach((item, index) => {
+    const id = String(item.id)
+    const nextPlan = timelinePlans[index + 1]
+    const from = item.id === plan.id && effectiveStartDate
+      ? effectiveStartDate
+      : typeof item.effective_start_date === 'string' ? item.effective_start_date : undefined
+    const until = nextPlan && typeof nextPlan.effective_start_date === 'string'
+      ? nextPlan.effective_start_date
+      : nextPlan && index + 1 === timelinePlans.length - 1 ? effectiveStartDate : undefined
+    boundsByPlan.set(id, { from, until })
+  })
+
   const [{ data: weekData }, { data: workoutData }] = await Promise.all([
-    supabase.from('plan_weeks').select('*').eq('plan_id', planId).order('week_number'),
-    supabase.from('planned_workouts').select('*').eq('plan_id', planId).order('workout_date'),
+    supabase.from('plan_weeks').select('*').in('plan_id', planIds).order('week_number'),
+    supabase.from('planned_workouts').select('*').in('plan_id', planIds).order('workout_date'),
   ])
   const weeks = (weekData ?? []) as unknown as Row[]
-  const workouts = (workoutData ?? []) as unknown as Row[]
+  const allWorkouts = (workoutData ?? []) as unknown as Row[]
+  const workouts = allWorkouts.filter((workout) => {
+    const bounds = boundsByPlan.get(String(workout.plan_id))
+    if (!bounds) return false
+    const workoutDate = String(workout.workout_date)
+    if (bounds.from && workoutDate < bounds.from) return false
+    if (bounds.until && workoutDate >= bounds.until) return false
+    return true
+  })
   const workoutIds = workouts.map((item) => String(item.id))
   const [{ data: stepData }, { data: feedbackData }] = workoutIds.length ? await Promise.all([
     supabase.from('workout_steps').select('*').in('planned_workout_id', workoutIds).order('step_order'),
@@ -126,7 +158,7 @@ async function loadPlan(supabase: Awaited<ReturnType<typeof import('@/lib/supaba
     const weekId = String(workout.plan_week_id)
     workoutsByWeek.set(weekId, [...(workoutsByWeek.get(weekId) ?? []), workout])
   }
-  const planWeeks: PlanWeek[] = weeks.map((week) => {
+  const planWeeks: PlanWeek[] = weeks.flatMap((week) => {
     const weekId = String(week.id)
     const weekWorkouts = (workoutsByWeek.get(weekId) ?? []).sort((a, b) => Number(a.workout_order) - Number(b.workout_order)).map((workout) => {
       const workoutId = String(workout.id)
@@ -139,7 +171,7 @@ async function loadPlan(supabase: Awaited<ReturnType<typeof import('@/lib/supaba
         intensity: typeof step.intensity === 'string' ? step.intensity as 'E' | 'M' | 'T' | 'I' | 'R' : undefined,
       }))
       const checkinState = checkin?.state
-      const state: PlanWeek['workouts'][number]['status'] = checkinState === 'completed' ? 'completed' : checkinState === 'skipped' ? 'skipped' : workout.state === 'adjusted' ? 'adjusted' : workout.state === 'skipped' ? 'skipped' : 'planned'
+      const state: PlanWeek['workouts'][number]['status'] = checkinState === 'completed' || workout.state === 'completed' ? 'completed' : checkinState === 'skipped' ? 'skipped' : workout.state === 'adjusted' ? 'adjusted' : workout.state === 'skipped' ? 'skipped' : 'planned'
       const feedbackEffort = ['easier', 'as_expected', 'harder', 'not_good'].includes(String(checkin?.effort))
         ? String(checkin?.effort) as NonNullable<PlanWeek['workouts'][number]['feedback']>['effort']
         : undefined
@@ -165,23 +197,39 @@ async function loadPlan(supabase: Awaited<ReturnType<typeof import('@/lib/supaba
         feedback,
       }
     })
-    return {
+    if (!weekWorkouts.length) return []
+    return [{
+      id: weekId,
       weekNumber: Number(week.week_number),
       phase: String(week.phase) as PlanWeek['phase'],
       goal: String(week.goal ?? ''),
       isRecoveryWeek: Boolean(week.is_recovery_week),
       workouts: weekWorkouts,
-    }
-  })
+    }]
+  }).sort((a, b) => (a.workouts[0]?.date ?? '').localeCompare(b.workouts[0]?.date ?? ''))
+
   const length = Number(plan.plan_length) as 12 | 16 | 20
-  const today = new Date(todayDateISO() + 'T12:00:00.000Z')
-  const optionalWorkout = workouts.find((workout) => Boolean(workout.is_optional))
+  const todayDate = todayDateISO()
+  const today = new Date(todayDate + 'T12:00:00.000Z')
+  const todayWeekStart = new Date(today)
+  const weekday = todayWeekStart.getUTCDay()
+  todayWeekStart.setUTCDate(todayWeekStart.getUTCDate() - (weekday === 0 ? 6 : weekday - 1))
+  const todayWeekStartISO = todayWeekStart.toISOString().slice(0, 10)
+  const todayWeekEnd = new Date(todayWeekStart)
+  todayWeekEnd.setUTCDate(todayWeekEnd.getUTCDate() + 6)
+  const todayWeekEndISO = todayWeekEnd.toISOString().slice(0, 10)
+  const currentPlanWeek = planWeeks.find((week) => week.workouts.some((workout) => workout.date >= todayWeekStartISO && workout.date <= todayWeekEndISO))
+    ?? planWeeks.find((week) => (week.workouts[0]?.date ?? '') >= todayDate)
+    ?? planWeeks[0]
+  const activeWorkouts = workouts.filter((workout) => String(workout.plan_id) === planId)
+  const optionalWorkout = activeWorkouts.find((workout) => Boolean(workout.is_optional))
   const optionalTrainingDay = optionalWorkout ? new Date(String(optionalWorkout.workout_date) + 'T12:00:00.000Z').getUTCDay() : 6
   return {
     length,
     marathonDate: String(plan.marathon_date),
     goalTime: timeLabel(plan.goal_time_seconds),
-    currentWeek: currentWeekNumber(planWeeks, today),
+    currentWeek: currentPlanWeek?.weekNumber ?? currentWeekNumber(planWeeks, today),
+    currentWeekId: currentPlanWeek?.id,
     weeks: planWeeks,
     trainingDays: Array.isArray(plan.training_days) ? plan.training_days.map(Number) : [2, 4, 0],
     includeOptionalFourth: Boolean(plan.has_optional_fourth),
@@ -235,7 +283,7 @@ async function loadCoachData(supabase: Awaited<ReturnType<typeof import('@/lib/s
   }
   const athleteData = await Promise.all(athleteIds.map(async (athleteId): Promise<AthleteSummary> => {
     const [plan, activities, wellness] = await Promise.all([loadPlan(supabase, athleteId), loadActivities(supabase, athleteId), loadWellness(supabase, athleteId)])
-    const currentWeek = plan?.weeks.find((week) => week.weekNumber === plan.currentWeek)
+    const currentWeek = plan?.weeks.find((week) => week.id === plan.currentWeekId) ?? plan?.weeks.find((week) => week.weekNumber === plan.currentWeek)
     const required = currentWeek?.workouts.filter((workout) => !workout.optional) ?? []
     const completed = required.filter((workout) => workout.status === 'completed')
     const latestActivity = activities[0]
