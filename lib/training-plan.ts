@@ -41,6 +41,7 @@ export type PlannedWorkout = {
 
 export type PlanWeek = {
   id?: string
+  historical?: boolean
   weekNumber: number
   phase: Phase
   goal: string
