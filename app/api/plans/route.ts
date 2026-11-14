@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { calculateTrainingPaces, generatePlan, parseDurationToSeconds, type PlanLength } from '@/lib/training-plan'
+import { calculateTrainingPaces, generatePlan, nextMondayDate, parseDurationToSeconds, type PlanLength } from '@/lib/training-plan'
 import { isSameOriginRequest, jsonError } from '@/lib/http'
 
 function isPlanLength(value: unknown): value is PlanLength {
@@ -24,7 +24,8 @@ export async function POST(request: Request) {
 
   let body: Record<string, unknown>
   try { body = await request.json() as Record<string, unknown> } catch { return jsonError('Controleer de ingevulde gegevens.', 400) }
-  const targetAthleteId = typeof body.athleteId === 'string' && body.athleteId ? body.athleteId : user.id
+  const targetAthleteId = typeof body.athleteId === 'string' && body.athleteId ? body.athleteId : ''
+  if (!targetAthleteId || targetAthleteId === user.id) return jsonError('Alleen de coach kan een trainingsschema instellen voor een toegewezen atleet.', 403)
   const length = Number(body.planLength)
   const marathonDate = typeof body.marathonDate === 'string' ? body.marathonDate : ''
   const goalSeconds = parseDurationToSeconds(typeof body.goalTime === 'string' ? body.goalTime : '')
@@ -41,13 +42,13 @@ export async function POST(request: Request) {
     return jsonError('Kies voor de optionele training een dag die niet al bij de vaste dagen staat.', 400)
   }
 
-  let coachId: string | null = null
-  if (targetAthleteId !== user.id) {
-    const { data: coachRole } = await supabase.from('coach_roles').select('user_id').eq('user_id', user.id).maybeSingle()
-    const { data: assignment } = await supabase.from('coach_athletes').select('athlete_id').eq('coach_id', user.id).eq('athlete_id', targetAthleteId).eq('status', 'active').maybeSingle()
-    if (!coachRole || !assignment) return jsonError('Je kunt alleen een plan maken voor een atleet die aan jou is toegewezen.', 403)
-    coachId = user.id
-  }
+  const { data: coachRole } = await supabase.from('coach_roles').select('user_id').eq('user_id', user.id).maybeSingle()
+  const { data: assignment } = await supabase.from('coach_athletes').select('athlete_id').eq('coach_id', user.id).eq('athlete_id', targetAthleteId).eq('status', 'active').maybeSingle()
+  if (!coachRole || !assignment) return jsonError('Je kunt alleen een plan maken voor een atleet die aan jou is toegewezen.', 403)
+  const coachId = user.id
+  const { data: activePlan, error: activePlanError } = await supabase.from('training_plans').select('id').eq('athlete_id', targetAthleteId).eq('status', 'active').order('created_at', { ascending: false }).limit(1).maybeSingle()
+  if (activePlanError) return jsonError('Het bestaande schema kon niet worden gecontroleerd. Probeer het opnieuw.', 500)
+  const effectiveStartDate = activePlan ? nextMondayDate() : undefined
 
   const raceDistance = Number(body.recentRaceDistanceKm)
   const raceTime = Number(body.recentRaceTimeSeconds)
@@ -56,7 +57,7 @@ export async function POST(request: Request) {
     : {}
   let weeks
   try {
-    weeks = generatePlan({ marathonDate, length, trainingDays, includeOptionalFourth, optionalTrainingDay, goalTimeSeconds: goalSeconds })
+    weeks = generatePlan({ marathonDate, length, trainingDays, includeOptionalFourth, optionalTrainingDay, goalTimeSeconds: goalSeconds, effectiveStartDate })
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : 'Het plan kan niet worden opgebouwd.', 400)
   }
@@ -108,6 +109,7 @@ export async function POST(request: Request) {
       coach_id: coachId,
       plan_length: length,
       marathon_date: marathonDate,
+      effective_start_date: effectiveStartDate ?? null,
       goal_time_seconds: goalSeconds,
       recent_race_distance_km: Number.isFinite(raceDistance) && raceDistance > 0 ? raceDistance : null,
       recent_race_time_seconds: Number.isFinite(raceTime) && raceTime > 0 ? raceTime : null,
