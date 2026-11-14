@@ -40,6 +40,7 @@ export type PlannedWorkout = {
 }
 
 export type PlanWeek = {
+  id?: string
   weekNumber: number
   phase: Phase
   goal: string
@@ -55,6 +56,7 @@ export type PlanInput = {
   optionalTrainingDay?: number
   goalTimeSeconds?: number
   startingWeeklyKm?: number
+  effectiveStartDate?: string
 }
 
 const LONG_RUNS: Record<PlanLength, number[]> = {
@@ -107,6 +109,13 @@ function utcDate(date: string): Date {
 
 function dateOnly(value: Date): string {
   return value.toISOString().slice(0, 10)
+}
+
+export function nextMondayDate(fromDate = todayDateISO()): string {
+  const result = utcDate(fromDate)
+  const daysUntilMonday = ((8 - result.getUTCDay()) % 7) || 7
+  result.setUTCDate(result.getUTCDate() + daysUntilMonday)
+  return dateOnly(result)
 }
 
 function mondayOf(value: Date): Date {
@@ -332,10 +341,14 @@ export function generatePlan(input: PlanInput): PlanWeek[] {
     throw new Error('Kies voor de optionele training een dag die niet al bij je vaste dagen staat.')
   }
   const raceDate = utcDate(input.marathonDate)
-  if (dateOnly(raceDate) < todayDateISO()) throw new Error('De marathondatum ligt in het verleden. Kies een toekomstige datum.')
-  const firstWorkoutDate = getPlanStartDate(input)
-  if (firstWorkoutDate < todayDateISO()) {
-    const startLabel = new Intl.DateTimeFormat('nl-NL', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Amsterdam' }).format(utcDate(firstWorkoutDate))
+  const today = todayDateISO()
+  if (dateOnly(raceDate) < today) throw new Error('De marathondatum ligt in het verleden. Kies een toekomstige datum.')
+  const effectiveStartDate = input.effectiveStartDate ? dateOnly(utcDate(input.effectiveStartDate)) : getPlanStartDate(input)
+  if (input.effectiveStartDate) {
+    if (effectiveStartDate < today) throw new Error('De nieuwe planning kan niet in het verleden ingaan.')
+    if (dateOnly(raceDate) <= effectiveStartDate) throw new Error('De marathondatum valt vóór of op de eerstvolgende planningsweek. Kies een latere datum of bespreek de wijziging met je coach.')
+  } else if (effectiveStartDate < today) {
+    const startLabel = new Intl.DateTimeFormat('nl-NL', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Amsterdam' }).format(utcDate(effectiveStartDate))
     throw new Error(`Dit schema zou starten op ${startLabel}, in het verleden. Kies een korter schema of een latere marathondatum.`)
   }
   const raceWeekMonday = mondayOf(raceDate)
@@ -349,7 +362,7 @@ export function generatePlan(input: PlanInput): PlanWeek[] {
     weekStart.setUTCDate(weekStart.getUTCDate() - (input.length - week) * 7)
 
     const trainingDays = [...days].sort((a, b) => (a === 0 ? 6 : a - 1) - (b === 0 ? 6 : b - 1))
-    const sessions: PlannedWorkout[] = [easySession(week, phase), qualitySession(week, phase, isRecoveryWeek), longSession(week, input.length, phase, isRecoveryWeek)]
+    let sessions: PlannedWorkout[] = [easySession(week, phase), qualitySession(week, phase, isRecoveryWeek), longSession(week, input.length, phase, isRecoveryWeek)]
 
     sessions.forEach((session, index) => {
       const scheduled = session.type === 'race' ? raceDate : dateInWeek(weekStart, trainingDays[index])
@@ -377,6 +390,7 @@ export function generatePlan(input: PlanInput): PlanWeek[] {
       }
     }
 
+    sessions = sessions.filter((session) => session.date >= effectiveStartDate)
     weeks.push({ weekNumber: week, phase, goal: phaseGoal(phase, isRecoveryWeek), isRecoveryWeek, workouts: sessions })
   }
 
