@@ -1203,7 +1203,6 @@ function ProfileView({ data, role, athletes, selectedAthlete, onSelectAthlete, d
         {role === 'coach'
           ? <label className="field full"><span>Atleet</span><select aria-label="Atleet selecteren" required value={selectedAthlete?.id ?? ''} onChange={(event) => onSelectAthlete(event.target.value)}><option value="" disabled>Kies een atleet</option>{[...athletes].sort((a, b) => a.name.localeCompare(b.name, 'nl')).map((athlete) => <option key={athlete.id} value={athlete.id}>{athlete.name}{athlete.email ? ' (' + athlete.email + ')' : ''}</option>)}</select></label>
           : <label className="field full"><span>Naam</span><input value={data.profile.name} readOnly /></label>}
-        {role === 'athlete' ? <div className="profile-lock-notice" role="status"><Icon name="shield" size={17} /><span>{data.plan ? 'Je coach beheert deze marathoninstellingen. Je kunt ze hier bekijken en je trainingen en feedback blijven invullen. Bespreek aanpassingen met je coach.' : 'Je coach stelt je marathonplan samen. Zodra het klaarstaat, zie je de instellingen hier.'}</span></div> : null}
         {role === 'coach' && !selectedAthlete ? <p className="plan-timing-note">Selecteer een atleet om diens schema-instellingen te bekijken of aan te passen.</p> : null}
         <div className="form-row">
           <label className="field"><span>Marathondatum</span><input type="date" min={todayDateISO()} required value={draft.marathonDate} disabled={planLocked} onChange={(event) => setDraft({ ...draft, marathonDate: event.target.value })} /></label>
