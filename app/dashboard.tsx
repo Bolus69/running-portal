@@ -112,6 +112,26 @@ function raceTimeInput(seconds?: number): string {
     : [minutes, remainder].map((part) => String(part).padStart(2, '0')).join(':')
 }
 
+function profileDraftForAthlete(athlete?: AthleteSummary): ProfileDraft {
+  const workouts = athlete?.planWeeks?.[0]?.workouts ?? []
+  const inferredDays = [...new Set(workouts.filter((workout) => !workout.optional).map((workout) => new Date(workout.date + 'T12:00:00').getDay()))]
+  const optionalWorkout = workouts.find((workout) => workout.optional)
+  const suggestedDate = new Date()
+  suggestedDate.setDate(suggestedDate.getDate() + (athlete?.planLength ?? 16) * 7)
+  return {
+    marathonDate: athlete?.marathonDate || todayDateISO(suggestedDate),
+    goalTime: athlete?.goalTime || '04:00:00',
+    planLength: athlete?.planLength ?? 16,
+    days: inferredDays.length === 3 ? inferredDays : athlete?.trainingDays ?? [2, 4, 0],
+    optional: athlete?.includeOptionalFourth ?? Boolean(optionalWorkout),
+    optionalTrainingDay: athlete?.optionalTrainingDay ?? (optionalWorkout ? new Date(optionalWorkout.date + 'T12:00:00').getDay() : 6),
+    raceTime: raceTimeInput(athlete?.recentRaceTimeSeconds),
+    raceDistance: athlete?.recentRaceDistanceKm ? String(athlete.recentRaceDistanceKm) : '',
+    recentWeeklyKm: athlete?.recentWeeklyKm ? String(athlete.recentWeeklyKm) : '',
+    recentLongestRunKm: athlete?.recentLongestRunKm ? String(athlete.recentLongestRunKm) : '',
+  }
+}
+
 function paceIntensityLabel(value?: string): string {
   if (!value) return ''
   const labels: Record<string, string> = {
@@ -216,6 +236,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
   const [syncingStrava, setSyncingStrava] = useState(false)
   const [expandedWorkout, setExpandedWorkout] = useState<string | null>(null)
   const [selectedAthlete, setSelectedAthlete] = useState<AthleteSummary | null>(null)
+  const [profileAthleteId, setProfileAthleteId] = useState<string | null>(initialData.athletes[0]?.id ?? null)
   const [draft, setDraft] = useState<ManualDraft>({ name: '', date: todayDateISO(), duration: '', distance: '', heartRate: '', effort: '', note: '', plannedWorkoutId: '' })
   const [lapDrafts, setLapDrafts] = useState<ActivityLap[]>([])
   const [wellnessDraft, setWellnessDraft] = useState<WellnessDraft>({ sleepHours: '', restingHeartRate: '', recoveryScore: '', note: '', visibleToCoach: false })
@@ -299,11 +320,27 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
   const requiredThisWeek = activeWeek?.workouts.filter((workout) => !workout.optional).length ?? 0
   const progress = requiredThisWeek > 0 ? Math.round((completedThisWeek / requiredThisWeek) * 100) : 0
   const nextTraining = activeWeek?.workouts.find((workout) => workout.status === 'planned' && !workout.optional)
+  const profileAthlete = data.athletes.find((athlete) => athlete.id === profileAthleteId) ?? data.athletes[0] ?? null
   const paces = calculateTrainingPaces(Number(profileDraft.raceDistance), parseDurationToSeconds(profileDraft.raceTime) ?? 0, parseDurationToSeconds(profileDraft.goalTime) ?? undefined)
   const feedbackLinkedActivity = feedbackWorkout ? data.activities.find((activity) => activity.plannedWorkoutId === feedbackWorkout.id) : undefined
 
   const showToast = (message: string) => setToast(message)
-  const go = (next: View) => { setView(next); setSelectedAthlete(null) }
+  const go = (next: View) => {
+    if (next === 'profile' && role === 'coach') {
+      const athlete = profileAthlete ?? data.athletes[0]
+      setProfileAthleteId(athlete?.id ?? null)
+      if (athlete) setProfileDraft(profileDraftForAthlete(athlete))
+    }
+    setView(next)
+    setSelectedAthlete(null)
+  }
+
+  function selectProfileAthlete(id: string) {
+    const athlete = data.athletes.find((item) => item.id === id)
+    if (!athlete) return
+    setProfileAthleteId(athlete.id)
+    setProfileDraft(profileDraftForAthlete(athlete))
+  }
 
   function openWorkoutFeedback(workout: PlanWeek['workouts'][number]) {
     setFeedbackWorkout(workout)
@@ -612,6 +649,75 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
     if (!demoMode) router.refresh()
   }
 
+  async function saveCoachProfile(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!profileAthlete) return showToast('Selecteer eerst een atleet.')
+    const goalSeconds = parseDurationToSeconds(profileDraft.goalTime)
+    if (!goalSeconds) return showToast('Gebruik voor de streeftijd uu:mm:ss, bijvoorbeeld 04:00:00.')
+    if (profileDraft.days.length !== 3) return showToast('Kies precies drie vaste trainingsdagen.')
+    const recentWeeklyKm = profileDraft.recentWeeklyKm ? Number(profileDraft.recentWeeklyKm) : undefined
+    const recentLongestRunKm = profileDraft.recentLongestRunKm ? Number(profileDraft.recentLongestRunKm) : undefined
+    const recentRaceDistanceKm = profileDraft.raceDistance ? Number(profileDraft.raceDistance) : undefined
+    const recentRaceTimeSeconds = profileDraft.raceTime ? parseDurationToSeconds(profileDraft.raceTime) : undefined
+    let weeks: PlanWeek[]
+    try {
+      weeks = generatePlan({
+        marathonDate: profileDraft.marathonDate,
+        length: profileDraft.planLength,
+        trainingDays: profileDraft.days,
+        includeOptionalFourth: profileDraft.optional,
+        optionalTrainingDay: profileDraft.optionalTrainingDay,
+        goalTimeSeconds: goalSeconds,
+      })
+    } catch (error) {
+      return showToast(error instanceof Error ? error.message : 'Het plan kan niet worden opgebouwd.')
+    }
+    if (!demoMode) {
+      const response = await fetch('/api/plans', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          athleteId: profileAthlete.id,
+          marathonDate: profileDraft.marathonDate,
+          planLength: profileDraft.planLength,
+          goalTime: profileDraft.goalTime,
+          trainingDays: profileDraft.days,
+          includeOptionalFourth: profileDraft.optional,
+          optionalTrainingDay: profileDraft.optionalTrainingDay,
+          recentRaceDistanceKm,
+          recentRaceTimeSeconds,
+          recentWeeklyKm,
+          recentLongestRunKm,
+        }),
+      })
+      const result = await response.json().catch(() => ({})) as { error?: string }
+      if (!response.ok) return showToast(result.error ?? 'Het atleetprofiel kon niet worden opgeslagen.')
+    }
+    const currentWeek = currentWeekNumber(weeks)
+    const currentPlanWeek = weeks.find((week) => week.weekNumber === currentWeek)
+    const updatedAthlete: AthleteSummary = {
+      ...profileAthlete,
+      marathonDate: profileDraft.marathonDate,
+      goalTime: profileDraft.goalTime,
+      planLength: profileDraft.planLength,
+      trainingDays: [...profileDraft.days],
+      includeOptionalFourth: profileDraft.optional,
+      optionalTrainingDay: profileDraft.optionalTrainingDay,
+      recentRaceDistanceKm,
+      recentRaceTimeSeconds,
+      recentWeeklyKm,
+      recentLongestRunKm,
+      currentWeek,
+      phase: currentPlanWeek?.phase ?? 'Basis',
+      plannedThisWeek: currentPlanWeek?.workouts.filter((workout) => !workout.optional).length ?? 0,
+      completedThisWeek: 0,
+      planWeeks: weeks,
+    }
+    setData((current) => ({ ...current, athletes: current.athletes.map((athlete) => athlete.id === updatedAthlete.id ? updatedAthlete : athlete) }))
+    showToast(demoMode ? 'Voorbeeldprofiel bijgewerkt voor ' + updatedAthlete.name + '.' : 'Atleetprofiel bijgewerkt voor ' + updatedAthlete.name + '.')
+    if (!demoMode) router.refresh()
+  }
+
   async function addCoachNote(note: string): Promise<boolean> {
     if (!selectedAthlete || !note.trim()) return false
     let savedNote: CoachNote = { id: 'note-' + Date.now(), note: note.trim(), createdAt: new Date().toISOString() }
@@ -730,10 +836,10 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
   const todayWellness = data.wellness.find((item) => item.date === todayDateISO())
   const navItems = role === 'athlete'
     ? [{ id: 'week' as const, icon: 'appLogo', label: 'Deze week' }, { id: 'plan' as const, icon: 'plan', label: 'Mijn schema' }, { id: 'history' as const, icon: 'history', label: 'Geschiedenis' }, { id: 'wellness' as const, icon: 'heart', label: 'Herstel & welzijn' }, { id: 'profile' as const, icon: 'user', label: 'Mijn profiel' }]
-    : [{ id: 'coach' as const, icon: 'coach', label: 'Overzicht' }, { id: 'athletes' as const, icon: 'people', label: 'Atleten' }, { id: 'suggestions' as const, icon: 'spark', label: 'Voorstellen' }, { id: 'profile' as const, icon: 'user', label: 'Mijn profiel' }]
-  const shortMobileLabels: Record<string, string> = { week: 'Week', plan: 'Schema', history: 'Historie', wellness: 'Herstel', profile: 'Profiel', coach: 'Overzicht', athletes: 'Atleten', suggestions: 'Voorstel' }
+    : [{ id: 'coach' as const, icon: 'coach', label: 'Overzicht' }, { id: 'athletes' as const, icon: 'people', label: 'Atleten' }, { id: 'suggestions' as const, icon: 'spark', label: 'Voorstellen' }, { id: 'profile' as const, icon: 'user', label: 'Atleetprofiel' }]
+  const shortMobileLabels: Record<string, string> = { week: 'Week', plan: 'Schema', history: 'Historie', wellness: 'Herstel', profile: role === 'coach' ? 'Atleet' : 'Profiel', coach: 'Overzicht', athletes: 'Atleten', suggestions: 'Voorstel' }
   const mobileNavItems = navItems.map((item) => ({ ...item, mobileLabel: shortMobileLabels[item.id] ?? item.label }))
-  const title = view === 'week' ? 'Deze week' : view === 'plan' ? 'Mijn schema' : view === 'history' ? 'Trainingsgeschiedenis' : view === 'wellness' ? 'Herstel & welzijn' : view === 'profile' ? 'Mijn profiel' : view === 'athletes' ? 'Mijn atleten' : view === 'suggestions' ? 'Coachvoorstellen' : view === 'athlete-detail' ? selectedAthlete?.name ?? 'Atleet' : 'Coachoverzicht'
+  const title = view === 'week' ? 'Deze week' : view === 'plan' ? 'Mijn schema' : view === 'history' ? 'Trainingsgeschiedenis' : view === 'wellness' ? 'Herstel & welzijn' : view === 'profile' ? role === 'coach' ? 'Atleetprofiel' : 'Mijn profiel' : view === 'athletes' ? 'Mijn atleten' : view === 'suggestions' ? 'Coachvoorstellen' : view === 'athlete-detail' ? selectedAthlete?.name ?? 'Atleet' : 'Coachoverzicht'
 
   return (
     <div className="app-shell">
@@ -789,7 +895,8 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
           {view === 'plan' && <PlanView plan={plan} activities={data.activities} onWorkout={setExpandedWorkout} expandedWorkout={expandedWorkout} onEnterWorkout={openWorkoutFeedback} />}
           {view === 'history' && <HistoryView activities={data.activities} workouts={plan?.weeks.flatMap((week) => week.workouts) ?? []} onEditWorkout={openWorkoutFeedbackById} onAdd={() => setModal('activity')} />}
           {view === 'wellness' && <WellnessView wellness={data.wellness} todayWellness={todayWellness} draft={wellnessDraft} setDraft={setWellnessDraft} onSubmit={saveWellness} />}
-          {view === 'profile' && <ProfileView data={data} draft={profileDraft} setDraft={setProfileDraft} paces={paces} onSubmit={savePlan} onConnect={() => { if (!demoMode) router.push('/api/strava/connect'); else showToast('Strava koppelen werkt zodra de app-instellingen zijn aangesloten.') }} onSync={syncStrava} syncingStrava={syncingStrava} onDisconnect={disconnectStrava} demoMode={demoMode} />}
+          {view === 'profile' && role === 'coach' && data.athletes.length === 0 && <div className="empty-state"><div className="empty-plan-mark"><Icon name="people" size={24} /></div><h3>Nog geen atleten</h3><p>Nodig eerst een atleet uit. Daarna kun je hier diens marathoninstellingen bekijken en beheren.</p><button type="button" className="button button-primary button-small" onClick={() => setModal('invite')}><Icon name="plus" size={15} /> Atleet uitnodigen</button></div>}
+          {view === 'profile' && (role === 'athlete' || profileAthlete) && <ProfileView data={data} role={role} athletes={data.athletes} selectedAthlete={role === 'coach' ? profileAthlete : null} onSelectAthlete={selectProfileAthlete} draft={profileDraft} setDraft={setProfileDraft} paces={paces} onSubmit={role === 'coach' ? saveCoachProfile : savePlan} onConnect={() => { if (!demoMode) router.push('/api/strava/connect'); else showToast('Strava koppelen werkt zodra de app-instellingen zijn aangesloten.') }} onSync={syncStrava} syncingStrava={syncingStrava} onDisconnect={disconnectStrava} demoMode={demoMode} />}
           {view === 'coach' && <CoachView data={data} onAthlete={(athlete) => { setSelectedAthlete(athlete); setView('athlete-detail') }} onSuggestions={() => go('suggestions')} onUpdateSuggestion={updateSuggestion} />}
           {view === 'athletes' && <AthletesView athletes={data.athletes} onAthlete={(athlete) => { setSelectedAthlete(athlete); setView('athlete-detail') }} onInvite={() => setModal('invite')} />}
           {view === 'suggestions' && <SuggestionsView suggestions={data.suggestions} onUpdate={updateSuggestion} onEvaluate={evaluateCoachSuggestions} evaluating={evaluatingSuggestions} />}
@@ -1047,15 +1154,17 @@ function WellnessView({ wellness, todayWellness, draft, setDraft, onSubmit }: { 
   )
 }
 
-function ProfileView({ data, draft, setDraft, paces, onSubmit, onConnect, onSync, syncingStrava, onDisconnect, demoMode }: { data: DashboardData; draft: ProfileDraft; setDraft: React.Dispatch<React.SetStateAction<ProfileDraft>>; paces: ReturnType<typeof calculateTrainingPaces>; onSubmit: (event: React.FormEvent<HTMLFormElement>) => void; onConnect: () => void; onSync: () => void; syncingStrava: boolean; onDisconnect: () => void; demoMode: boolean }) {
+function ProfileView({ data, role, athletes, selectedAthlete, onSelectAthlete, draft, setDraft, paces, onSubmit, onConnect, onSync, syncingStrava, onDisconnect, demoMode }: { data: DashboardData; role: AppRole; athletes: AthleteSummary[]; selectedAthlete: AthleteSummary | null; onSelectAthlete: (id: string) => void; draft: ProfileDraft; setDraft: React.Dispatch<React.SetStateAction<ProfileDraft>>; paces: ReturnType<typeof calculateTrainingPaces>; onSubmit: (event: React.FormEvent<HTMLFormElement>) => void; onConnect: () => void; onSync: () => void; syncingStrava: boolean; onDisconnect: () => void; demoMode: boolean }) {
   return (
     <div className="profile-layout">
       <form className="profile-form-card" onSubmit={onSubmit}>
         <div className="section-heading">
-          <div><p className="eyebrow">MARATHONINSTELLINGEN</p><h2>Jouw startpunt</h2></div>
-          <span className="profile-avatar">{data.profile.name.charAt(0)}</span>
+          <div><p className="eyebrow">MARATHONINSTELLINGEN</p><h2>{role === 'coach' ? 'Atleetinstellingen' : 'Jouw startpunt'}</h2></div>
+          <span className="profile-avatar">{(role === 'coach' ? selectedAthlete?.name : data.profile.name)?.charAt(0) ?? 'A'}</span>
         </div>
-        <label className="field full"><span>Naam</span><input value={data.profile.name} readOnly /></label>
+        {role === 'coach'
+          ? <label className="field full"><span>Atleet</span><select aria-label="Atleet selecteren" required value={selectedAthlete?.id ?? ''} onChange={(event) => onSelectAthlete(event.target.value)}><option value="" disabled>Kies een atleet</option>{[...athletes].sort((a, b) => a.name.localeCompare(b.name, 'nl')).map((athlete) => <option key={athlete.id} value={athlete.id}>{athlete.name}{athlete.email ? ' (' + athlete.email + ')' : ''}</option>)}</select></label>
+          : <label className="field full"><span>Naam</span><input value={data.profile.name} readOnly /></label>}
         <div className="form-row">
           <label className="field"><span>Marathondatum</span><input type="date" min={todayDateISO()} required value={draft.marathonDate} onChange={(event) => setDraft({ ...draft, marathonDate: event.target.value })} /></label>
           <label className="field"><span>Gewenste streeftijd <small>uu:mm:ss</small></span><input required pattern="\d{2}:\d{2}:\d{2}" value={draft.goalTime} onChange={(event) => setDraft({ ...draft, goalTime: event.target.value })} placeholder="04:00:00" /></label>
@@ -1075,16 +1184,16 @@ function ProfileView({ data, draft, setDraft, paces, onSubmit, onConnect, onSync
           <small className="plan-context-hint">Bijvoorbeeld 10 km in 50:00. Gebruik bij voorkeur een recente wedstrijd of testloop.</small>
         </div>
         <div className="field full"><span>Recente trainingsbasis <small>optioneel, afgelopen 4 weken</small></span><div className="form-row"><label className="field"><span>Gemiddelde weekomvang <small>km per week</small></span><input type="number" min="0.1" max="300" step="0.1" value={draft.recentWeeklyKm} onChange={(event) => setDraft({ ...draft, recentWeeklyKm: event.target.value })} placeholder="Bijv. 35" /></label><label className="field"><span>Langste duurloop <small>km</small></span><input type="number" min="0.1" max="100" step="0.1" value={draft.recentLongestRunKm} onChange={(event) => setDraft({ ...draft, recentLongestRunKm: event.target.value })} placeholder="Bijv. 18" /></label></div><small className="plan-context-hint">Deze gegevens helpen de startbelasting te beoordelen. Ze passen het schema zelf niet automatisch aan.</small></div>
-        <button className="button button-primary">Plan opslaan <Icon name="arrow" size={16} /></button>
+        <button className="button button-primary">{role === 'coach' ? 'Schema opslaan voor atleet' : 'Plan opslaan'} <Icon name="arrow" size={16} /></button>
       </form>
       <aside className="profile-side">
         <div className="strava-card">
-          <div className="strava-logo"><span className="strava-mark">S</span><div><strong>Strava</strong><span>{data.stravaConnected ? 'Verbonden' : demoMode && data.activities.some((activity) => activity.source === 'strava') ? 'Verbonden in voorbeeld' : 'Nog niet gekoppeld'}</span></div></div>
-          <p>Koppel Strava om activiteiten op te halen en zelf aan de juiste training te koppelen. Bij beschikbare rondes zie je ook de afzonderlijke blokken.</p>
-          {data.stravaConnected && !demoMode
-            ? <div className="strava-actions"><button type="button" className="button button-outline full-width" onClick={onSync} disabled={syncingStrava}><Icon name="history" size={16} /> {syncingStrava ? 'Synchroniseren…' : 'Nu synchroniseren'}</button><button type="button" className="text-button subtle" onClick={onDisconnect}>Koppeling verwijderen</button></div>
-            : <button type="button" className="button button-outline full-width" onClick={onConnect}><Icon name="link" size={16} /> Strava koppelen</button>}
-          <small>Je Strava-wachtwoord wordt nooit opgeslagen.</small>
+          <div className="strava-logo"><span className="strava-mark">S</span><div><strong>Strava</strong><span>{role === 'coach' ? selectedAthlete?.stravaConnected ? 'Verbonden' : 'Nog niet gekoppeld' : data.stravaConnected ? 'Verbonden' : demoMode && data.activities.some((activity) => activity.source === 'strava') ? 'Verbonden in voorbeeld' : 'Nog niet gekoppeld'}</span></div></div>
+          {role === 'coach'
+            ? <><p>{selectedAthlete?.stravaConnected ? 'Deze atleet heeft Strava gekoppeld. Activiteiten verschijnen bij de trainingen.' : 'De atleet kan Strava koppelen vanuit het eigen profiel.'}</p><small>De Strava-koppeling wordt door de atleet beheerd.</small></>
+            : <><p>Koppel Strava om activiteiten op te halen en zelf aan de juiste training te koppelen. Bij beschikbare rondes zie je ook de afzonderlijke blokken.</p>{data.stravaConnected && !demoMode
+              ? <div className="strava-actions"><button type="button" className="button button-outline full-width" onClick={onSync} disabled={syncingStrava}><Icon name="history" size={16} /> {syncingStrava ? 'Synchroniseren…' : 'Nu synchroniseren'}</button><button type="button" className="text-button subtle" onClick={onDisconnect}>Koppeling verwijderen</button></div>
+              : <button type="button" className="button button-outline full-width" onClick={onConnect}><Icon name="link" size={16} /> Strava koppelen</button>}<small>Je Strava-wachtwoord wordt nooit opgeslagen.</small></>}
         </div>
         <div className="profile-help"><span className="aside-icon lime"><Icon name="spark" /></span><h3>Praattempo</h3><p>Gebruik je ademhaling naast tempo en hartslag om je inspanning in te schatten.</p><TalkTestGuide /><small className="talk-test-note">Een praktische richtlijn; wind, warmte en vermoeidheid tellen ook mee.</small></div>
         <details className="zone-reference"><summary><span><strong>Hartslagzones</strong><small>Open voor uitleg bij de zone-indeling</small></span><Icon name="chevron" size={18} /></summary><div className="zone-reference-list"><div><b>Z1</b><span><strong>Rustig</strong><small>&lt;75% · makkelijk praten</small></span></div><div><b>Z2</b><span><strong>Gecontroleerd</strong><small>75–82% · zinnen worden korter</small></span></div><div><b>Z3</b><span><strong>Vlot / stevig</strong><small>82–88% · korte zinnen</small></span></div><div><b>Z4</b><span><strong>Intensief</strong><small>89–92% · enkele woorden</small></span></div><div><b>Z5</b><span><strong>Korte versnelling</strong><small>&gt;92% · zwaar hijgen</small></span></div></div><p className="zone-note">Percentages zijn een richtlijn op basis van maximale hartslag. Gebruik ook je ademhaling en ervaren inspanning; hartslag hoeft niet ingevuld te zijn.</p><a className="zone-source" href="https://all4running.nl/blog/app/uploads/2025/05/HardloopschemaMarathonGevorderd.pdf" target="_blank" rel="noreferrer">Bekijk de bron van deze zone-indeling <span>↗</span></a></details>
