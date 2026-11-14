@@ -224,6 +224,10 @@ async function loadCoachData(supabase: Awaited<ReturnType<typeof import('@/lib/s
   ])
   const profiles = ((profileResult.data ?? []) as unknown as Row[])
   const nameById = new Map(profiles.map((profile) => [String(profile.id), String(profile.full_name ?? 'Atleet')]))
+  const { data: athleteStravaRows } = athleteIds.length
+    ? await admin.from('strava_connections').select('athlete_id,is_active').in('athlete_id', athleteIds)
+    : { data: [] }
+  const stravaConnectedAthletes = new Set(((athleteStravaRows ?? []) as unknown as Row[]).filter((row) => Boolean(row.is_active)).map((row) => String(row.athlete_id)))
   const notesByAthlete = new Map<string, { id: string; note: string; createdAt: string }[]>()
   for (const row of (noteResult.data ?? []) as unknown as Row[]) {
     const athleteId = String(row.athlete_id)
@@ -247,6 +251,12 @@ async function loadCoachData(supabase: Awaited<ReturnType<typeof import('@/lib/s
       marathonDate,
       goalTime: plan?.goalTime ?? '',
       planLength: plan?.length ?? 16,
+      trainingDays: plan?.trainingDays ?? [2, 4, 0],
+      includeOptionalFourth: plan?.includeOptionalFourth ?? false,
+      optionalTrainingDay: plan?.optionalTrainingDay ?? 6,
+      recentRaceDistanceKm: plan?.recentRaceDistanceKm,
+      recentRaceTimeSeconds: plan?.recentRaceTimeSeconds,
+      stravaConnected: stravaConnectedAthletes.has(athleteId),
       recentWeeklyKm: plan?.recentWeeklyKm,
       recentLongestRunKm: plan?.recentLongestRunKm,
       currentWeek: plan?.currentWeek ?? 1,
