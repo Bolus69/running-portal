@@ -137,11 +137,13 @@ function mergeRevisedPlanWeeks(previous: PlanWeek[], next: PlanWeek[], effective
   const history = previous.map((week, index) => ({
     ...week,
     id: week.id ?? 'history-' + week.weekNumber + '-' + (week.workouts[0]?.date ?? index),
+    historical: true,
     workouts: week.workouts.filter((workout) => workout.date < effectiveStartDate),
   })).filter((week) => week.workouts.length > 0)
   const upcoming = next.map((week) => ({
     ...week,
     id: 'current-' + week.weekNumber,
+    historical: false,
     workouts: week.workouts.filter((workout) => workout.date >= effectiveStartDate),
   })).filter((week) => week.workouts.length > 0)
   return [...history, ...upcoming].sort((a, b) => (a.workouts[0]?.date ?? '').localeCompare(b.workouts[0]?.date ?? ''))
@@ -1023,7 +1025,7 @@ function PlanView({ plan, activities, onWorkout, expandedWorkout, onEnterWorkout
           <details className="plan-week" key={week.id ?? week.weekNumber} open={week.id === plan.currentWeekId || (!plan.currentWeekId && week.weekNumber === plan.currentWeek)}>
             <summary>
               <span className="plan-week-number">{String(week.weekNumber).padStart(2, '0')}</span>
-              <span className="plan-week-copy"><strong>{phaseLabel(week.phase)}</strong><small>{week.goal}</small></span>
+              <span className="plan-week-copy"><strong>{phaseLabel(week.phase)}{week.historical ? ' · Eerdere planning' : ''}</strong><small>{week.goal}</small></span>
               {week.isRecoveryWeek && <span className="recovery-tag">Herstelweek</span>}
               <span className="plan-week-count">{week.workouts.filter((item) => item.status === 'completed').length}/{week.workouts.filter((item) => !item.optional).length}<Icon name="chevron" size={17} /></span>
             </summary>
@@ -1115,7 +1117,7 @@ function TrainingDaysControl({ draft, setDraft, disabled = false }: { draft: Pro
             </button>
           ))}
         </div>
-        <small className="day-selection-hint">Selecteer of deselecteer dagen. Je kunt eerst een nieuwe dag kiezen en daarna een oude uitzetten; opslaan vraagt precies drie dagen.</small>
+        <small className="day-selection-hint">{disabled ? 'Je coach beheert deze trainingsdagen.' : 'Selecteer of deselecteer dagen. Je kunt eerst een nieuwe dag kiezen en daarna een oude uitzetten; opslaan vraagt precies drie dagen.'}</small>
       </div>
       <label className="optional-setting full">
         <input type="checkbox" checked={draft.optional} disabled={disabled} onChange={(event) => toggleOptional(event.target.checked)} />
@@ -1201,7 +1203,7 @@ function ProfileView({ data, role, athletes, selectedAthlete, onSelectAthlete, d
         {role === 'coach'
           ? <label className="field full"><span>Atleet</span><select aria-label="Atleet selecteren" required value={selectedAthlete?.id ?? ''} onChange={(event) => onSelectAthlete(event.target.value)}><option value="" disabled>Kies een atleet</option>{[...athletes].sort((a, b) => a.name.localeCompare(b.name, 'nl')).map((athlete) => <option key={athlete.id} value={athlete.id}>{athlete.name}{athlete.email ? ' (' + athlete.email + ')' : ''}</option>)}</select></label>
           : <label className="field full"><span>Naam</span><input value={data.profile.name} readOnly /></label>}
-        {role === 'athlete' ? <div className="profile-lock-notice" role="status"><Icon name="shield" size={17} /><span>{data.plan ? 'Je coach beheert deze marathoninstellingen. Je kunt ze hier bekijken en je trainingen en feedback blijven invullen. Bespreek aanpassingen met je coach.' : 'Je coach stelt je marathonplan samen. Zodra het klaarstaat, zie je de instellingen hier.'}</span></div> : selectedAthlete?.planWeeks?.length ? <div className="profile-lock-notice" role="status"><Icon name="clock" size={17} /><span>Nieuwe schema-aanpassingen gaan in op maandag {dateLabel(nextMondayDate(), { day: 'numeric', month: 'long' })}. Eerdere trainingen en feedback blijven bewaard.</span></div> : null}
+        {role === 'athlete' ? <div className="profile-lock-notice" role="status"><Icon name="shield" size={17} /><span>{data.plan ? 'Je coach beheert deze marathoninstellingen. Je kunt ze hier bekijken en je trainingen en feedback blijven invullen. Bespreek aanpassingen met je coach.' : 'Je coach stelt je marathonplan samen. Zodra het klaarstaat, zie je de instellingen hier.'}</span></div> : null}
         {role === 'coach' && !selectedAthlete ? <p className="plan-timing-note">Selecteer een atleet om diens schema-instellingen te bekijken of aan te passen.</p> : null}
         <div className="form-row">
           <label className="field"><span>Marathondatum</span><input type="date" min={todayDateISO()} required value={draft.marathonDate} disabled={planLocked} onChange={(event) => setDraft({ ...draft, marathonDate: event.target.value })} /></label>
