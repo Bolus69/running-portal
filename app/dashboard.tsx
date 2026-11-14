@@ -658,7 +658,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
     const recentWeeklyKm = profileDraft.recentWeeklyKm ? Number(profileDraft.recentWeeklyKm) : undefined
     const recentLongestRunKm = profileDraft.recentLongestRunKm ? Number(profileDraft.recentLongestRunKm) : undefined
     const recentRaceDistanceKm = profileDraft.raceDistance ? Number(profileDraft.raceDistance) : undefined
-    const recentRaceTimeSeconds = profileDraft.raceTime ? parseDurationToSeconds(profileDraft.raceTime) : undefined
+    const recentRaceTimeSeconds = profileDraft.raceTime ? parseDurationToSeconds(profileDraft.raceTime) ?? undefined : undefined
     let weeks: PlanWeek[]
     try {
       weeks = generatePlan({
