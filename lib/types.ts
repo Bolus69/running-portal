@@ -88,6 +88,7 @@ export type DashboardData = {
     marathonDate: string
     goalTime: string
     currentWeek: number
+    currentWeekId?: string
     weeks: PlanWeek[]
     trainingDays: number[]
     includeOptionalFourth: boolean
