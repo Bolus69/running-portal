@@ -44,6 +44,12 @@ export type AthleteSummary = {
   lastFeedback?: string
   lastLongRun?: string
   risk: 'green' | 'orange' | 'red'
+  trainingDays?: number[]
+  includeOptionalFourth?: boolean
+  optionalTrainingDay?: number
+  recentRaceDistanceKm?: number
+  recentRaceTimeSeconds?: number
+  stravaConnected?: boolean
   recentWeeklyKm?: number
   recentLongestRunKm?: number
   reason?: string
