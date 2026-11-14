@@ -54,7 +54,8 @@ function PlanTimingNote({ draft }: { draft: ProfileDraft }) {
 
 function Icon({ name, size = 19 }: { name: string; size?: number }) {
   const common = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true as const }
-  const runnerMark = <><circle cx="15.8" cy="4.1" r="2.1" fill="currentColor" stroke="none" /><path d="m13.5 7.4-2.4 4.1M13.5 7.4l3.2 1.4 3.4-1.7M13.5 7.4l-3.2-1.1-2.5 1.8M11.1 11.5l-3 2.8 1.1 3.3-2.8.8M11.1 11.5l4.1 2.1 2.8 3.2 3 .7" stroke="currentColor" strokeWidth="2.2" /></>
+  // Font Awesome Free "person-running" by Fonticons, Inc. (CC BY 4.0): https://fontawesome.com/icons/person-running
+  const runnerMark = <path fill="currentColor" stroke="none" d="M400 224h-44l-26.12-53.25c-12.5-25.5-35.38-44.25-61.75-51L197 98.63C189.5 96.84 181.1 95.97 174.5 95.97c-20.88 0-41.33 6.81-58.26 19.78L76.5 146.3C68.31 152.5 64.01 162 64.01 171.6c0 17.11 13.67 32.02 32.02 32.02c6.808 0 13.67-2.158 19.47-6.616l39.63-30.38c5.92-4.488 13.01-6.787 19.53-6.787c2.017 0 3.981 .2196 5.841 .6623l14.62 4.25l-37.5 87.5C154.1 260.3 152.5 268.8 152.5 277.2c0 22.09 11.49 43.52 31.51 55.29l85 50.13l-27.5 87.75c-.9875 3.174-1.458 6.388-1.458 9.55c0 13.65 8.757 26.31 22.46 30.58C265.6 511.5 268.9 512 272 512c13.62 0 26.25-8.75 30.5-22.5l31.75-101c1.211-4.278 1.796-8.625 1.796-12.93c0-16.57-8.661-32.51-23.55-41.44l-61.13-36.12l31.25-78.38l20.25 41.5C310.9 277.4 327.9 288 345.1 288H400c17.62 0 32-14.38 32-32C432 238.3 417.6 224 400 224zM288 96c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zM129.8 317.5L114.9 352H48c-17.62 0-32 14.38-32 32s14.38 32 32 32h77.5c19.25 0 36.5-11.5 44-29.12l8.875-20.5l-10.75-6.25C150.4 349.9 137.6 334.8 129.8 317.5z" />
   const paths: Record<string, React.ReactNode> = {
     week: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/><path d="m8 15 2 2 5-5"/></>,
     plan: <><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21z"/><path d="M4 5.5v15M8 7h8M8 11h7"/></>,
@@ -83,7 +84,8 @@ function Icon({ name, size = 19 }: { name: string; size?: number }) {
     menu: <><path d="M4 6h16M4 12h16M4 18h16"/></>,
     more: <><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></>,
   }
-  return <svg {...common}>{paths[name] ?? paths.runner}</svg>
+  const isRunner = name === "runner" || name === "run"
+  return <svg {...common} viewBox={isRunner ? "0 0 448 512" : common.viewBox} fill={isRunner ? "currentColor" : common.fill} stroke={isRunner ? "none" : common.stroke}>{paths[name] ?? paths.runner}</svg>
 }
 
 function dateLabel(value: string, options: Intl.DateTimeFormatOptions = { weekday: 'short', day: 'numeric', month: 'short' }) {
