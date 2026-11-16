@@ -266,7 +266,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
   const [syncingStrava, setSyncingStrava] = useState(false)
   const [expandedWorkout, setExpandedWorkout] = useState<string | null>(null)
   const [selectedAthlete, setSelectedAthlete] = useState<AthleteSummary | null>(null)
-  const [profileAthleteId, setProfileAthleteId] = useState<string | null>(initialData.profile.role === 'coach' ? null : (initialData.athletes[0]?.id ?? null))
+  const [profileAthleteId, setProfileAthleteId] = useState<string | null>(initialData.profile.role === 'coach' ? null : initialData.athletes[0]?.id ?? null)
   const [draft, setDraft] = useState<ManualDraft>({ name: '', date: todayDateISO(), duration: '', distance: '', heartRate: '', effort: '', note: '', plannedWorkoutId: '' })
   const [lapDrafts, setLapDrafts] = useState<ActivityLap[]>([])
   const [wellnessDraft, setWellnessDraft] = useState<WellnessDraft>({ sleepHours: '', restingHeartRate: '', recoveryScore: '', note: '', visibleToCoach: false })
@@ -1227,7 +1227,8 @@ function ProfileView({ data, role, athletes, selectedAthlete, onSelectAthlete, d
           </div>
         </div>
         {role === 'coach' && <div className="field full"><span>Recente trainingsbasis <small>optioneel, afgelopen 4 weken</small></span><div className="form-row"><label className="field"><span>Gemiddelde weekomvang <small>km per week</small></span><input type="number" min="0.1" max="300" step="0.1" value={draft.recentWeeklyKm} readOnly={planLocked} onChange={(event) => setDraft({ ...draft, recentWeeklyKm: event.target.value })} placeholder="Bijv. 35" /></label><label className="field"><span>Langste duurloop <small>km</small></span><input type="number" min="0.1" max="100" step="0.1" value={draft.recentLongestRunKm} readOnly={planLocked} onChange={(event) => setDraft({ ...draft, recentLongestRunKm: event.target.value })} placeholder="Bijv. 18" /></label></div><small className="plan-context-hint">Deze gegevens helpen de startbelasting te beoordelen. Ze passen het schema zelf niet automatisch aan.</small></div>}
-        {role === 'coach' && <button className="button button-primary" disabled={!selectedAthlete}>Schema opslaan voor {selectedAthlete?.name ?? 'atleet'} <Icon name="arrow" size={16} /></button>}
+        {role === 'coach' && selectedAthlete && <small className="plan-context-hint">Dit schema wordt opgeslagen voor {selectedAthlete.name}{selectedAthlete.email ? ' (' + selectedAthlete.email + ')' : ''}.</small>}
+         {role === 'coach' && <button className="button button-primary" disabled={!selectedAthlete}>Schema opslaan voor {selectedAthlete?.name ?? 'atleet'} <Icon name="arrow" size={16} /></button>}
       </form>
       <aside className="profile-side">
         <div className="strava-card">
