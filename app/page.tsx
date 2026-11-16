@@ -19,5 +19,5 @@ export default async function HomePage() {
   } catch {
     return <SetupRequired />
   }
-  return <Dashboard initialData={data} demoMode={false} />
+  return <Dashboard key={data.profile.id + ':' + data.profile.role} initialData={data} demoMode={false} />
 }

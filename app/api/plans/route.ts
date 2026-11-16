@@ -26,7 +26,9 @@ export async function POST(request: Request) {
   try { body = await request.json() as Record<string, unknown> } catch { return jsonError('Controleer de ingevulde gegevens.', 400) }
   const targetAthleteId = typeof body.athleteId === 'string' && body.athleteId ? body.athleteId : ''
   if (!targetAthleteId) return jsonError('Selecteer eerst een atleet voor het trainingsschema.', 400)
-  if (targetAthleteId === user.id) return jsonError('Je kunt geen schema opslaan voor je eigen coachaccount. Kies een toegewezen atleet.', 403)
+  const { data: coachRole } = await supabase.from('coach_roles').select('user_id').eq('user_id', user.id).maybeSingle()
+  if (!coachRole) return jsonError('Je bent niet ingelogd als coach. Log uit en log in met je coachaccount.', 403)
+  if (targetAthleteId === user.id) return jsonError('Kies een toegewezen atleet; je eigen coachaccount kan geen trainingsschema krijgen.', 403)
   const length = Number(body.planLength)
   const marathonDate = typeof body.marathonDate === 'string' ? body.marathonDate : ''
   const goalSeconds = parseDurationToSeconds(typeof body.goalTime === 'string' ? body.goalTime : '')
@@ -43,9 +45,8 @@ export async function POST(request: Request) {
     return jsonError('Kies voor de optionele training een dag die niet al bij de vaste dagen staat.', 400)
   }
 
-  const { data: coachRole } = await supabase.from('coach_roles').select('user_id').eq('user_id', user.id).maybeSingle()
   const { data: assignment } = await supabase.from('coach_athletes').select('athlete_id').eq('coach_id', user.id).eq('athlete_id', targetAthleteId).eq('status', 'active').maybeSingle()
-  if (!coachRole || !assignment) return jsonError('Je kunt alleen een plan maken voor een atleet die aan jou is toegewezen.', 403)
+  if (!assignment) return jsonError('Je kunt alleen een plan maken voor een atleet die aan jou is toegewezen.', 403)
   const coachId = user.id
   const { data: activePlan, error: activePlanError } = await supabase.from('training_plans').select('id').eq('athlete_id', targetAthleteId).eq('status', 'active').order('created_at', { ascending: false }).limit(1).maybeSingle()
   if (activePlanError) return jsonError('Het bestaande schema kon niet worden gecontroleerd. Probeer het opnieuw.', 500)
