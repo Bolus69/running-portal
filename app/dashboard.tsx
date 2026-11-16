@@ -266,7 +266,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
   const [syncingStrava, setSyncingStrava] = useState(false)
   const [expandedWorkout, setExpandedWorkout] = useState<string | null>(null)
   const [selectedAthlete, setSelectedAthlete] = useState<AthleteSummary | null>(null)
-  const [profileAthleteId, setProfileAthleteId] = useState<string | null>(initialData.athletes[0]?.id ?? null)
+  const [profileAthleteId, setProfileAthleteId] = useState<string | null>(initialData.profile.role === 'coach' ? null : (initialData.athletes[0]?.id ?? null))
   const [draft, setDraft] = useState<ManualDraft>({ name: '', date: todayDateISO(), duration: '', distance: '', heartRate: '', effort: '', note: '', plannedWorkoutId: '' })
   const [lapDrafts, setLapDrafts] = useState<ActivityLap[]>([])
   const [wellnessDraft, setWellnessDraft] = useState<WellnessDraft>({ sleepHours: '', restingHeartRate: '', recoveryScore: '', note: '', visibleToCoach: false })
@@ -350,16 +350,14 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
   const requiredThisWeek = activeWeek?.workouts.filter((workout) => !workout.optional).length ?? 0
   const progress = requiredThisWeek > 0 ? Math.round((completedThisWeek / requiredThisWeek) * 100) : 0
   const nextTraining = activeWeek?.workouts.find((workout) => workout.status === 'planned' && !workout.optional)
-  const profileAthlete = data.athletes.find((athlete) => athlete.id === profileAthleteId) ?? data.athletes[0] ?? null
+  const profileAthlete = data.athletes.find((athlete) => athlete.id === profileAthleteId) ?? null
   const paces = calculateTrainingPaces(Number(profileDraft.raceDistance), parseDurationToSeconds(profileDraft.raceTime) ?? 0, parseDurationToSeconds(profileDraft.goalTime) ?? undefined)
   const feedbackLinkedActivity = feedbackWorkout ? data.activities.find((activity) => activity.plannedWorkoutId === feedbackWorkout.id) : undefined
 
   const showToast = (message: string) => setToast(message)
   const go = (next: View) => {
-    if (next === 'profile' && role === 'coach') {
-      const athlete = profileAthlete ?? data.athletes[0]
-      setProfileAthleteId(athlete?.id ?? null)
-      if (athlete) setProfileDraft(profileDraftForAthlete(athlete))
+    if (next === 'profile' && role === 'coach' && profileAthlete) {
+      setProfileDraft(profileDraftForAthlete(profileAthlete))
     }
     setView(next)
     setSelectedAthlete(null)
@@ -934,7 +932,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
           {view === 'wellness' && <WellnessView wellness={data.wellness} todayWellness={todayWellness} draft={wellnessDraft} setDraft={setWellnessDraft} onSubmit={saveWellness} />}
           {view === 'profile' && role === 'coach' && data.athletes.length === 0 && <div className="empty-state"><div className="empty-plan-mark"><Icon name="people" size={24} /></div><h3>Nog geen atleten</h3><p>Nodig eerst een atleet uit. Daarna kun je hier diens marathoninstellingen bekijken en beheren.</p><button type="button" className="button button-primary button-small" onClick={() => setModal('invite')}><Icon name="plus" size={15} /> Atleet uitnodigen</button></div>}
           {view === 'profile' && role === 'athlete' && !plan && <AthletePlanPending />}
-          {view === 'profile' && ((role === 'athlete' && Boolean(plan)) || (role === 'coach' && Boolean(profileAthlete))) && <ProfileView data={data} role={role} athletes={data.athletes} selectedAthlete={role === 'coach' ? profileAthlete : null} onSelectAthlete={selectProfileAthlete} draft={profileDraft} setDraft={setProfileDraft} paces={paces} onSubmit={role === 'coach' ? saveCoachProfile : savePlan} onConnect={() => { if (!demoMode) router.push('/api/strava/connect'); else showToast('Strava koppelen werkt zodra de app-instellingen zijn aangesloten.') }} onSync={syncStrava} syncingStrava={syncingStrava} onDisconnect={disconnectStrava} demoMode={demoMode} />}
+          {view === 'profile' && ((role === 'athlete' && Boolean(plan)) || role === 'coach') && <ProfileView data={data} role={role} athletes={data.athletes} selectedAthlete={role === 'coach' ? profileAthlete : null} onSelectAthlete={selectProfileAthlete} draft={profileDraft} setDraft={setProfileDraft} paces={paces} onSubmit={role === 'coach' ? saveCoachProfile : savePlan} onConnect={() => { if (!demoMode) router.push('/api/strava/connect'); else showToast('Strava koppelen werkt zodra de app-instellingen zijn aangesloten.') }} onSync={syncStrava} syncingStrava={syncingStrava} onDisconnect={disconnectStrava} demoMode={demoMode} />}
           {view === 'coach' && <CoachView data={data} onAthlete={(athlete) => { setSelectedAthlete(athlete); setView('athlete-detail') }} onSuggestions={() => go('suggestions')} onUpdateSuggestion={updateSuggestion} />}
           {view === 'athletes' && <AthletesView athletes={data.athletes} onAthlete={(athlete) => { setSelectedAthlete(athlete); setView('athlete-detail') }} onInvite={() => setModal('invite')} />}
           {view === 'suggestions' && <SuggestionsView suggestions={data.suggestions} onUpdate={updateSuggestion} onEvaluate={evaluateCoachSuggestions} evaluating={evaluatingSuggestions} />}
@@ -1229,7 +1227,7 @@ function ProfileView({ data, role, athletes, selectedAthlete, onSelectAthlete, d
           </div>
         </div>
         {role === 'coach' && <div className="field full"><span>Recente trainingsbasis <small>optioneel, afgelopen 4 weken</small></span><div className="form-row"><label className="field"><span>Gemiddelde weekomvang <small>km per week</small></span><input type="number" min="0.1" max="300" step="0.1" value={draft.recentWeeklyKm} readOnly={planLocked} onChange={(event) => setDraft({ ...draft, recentWeeklyKm: event.target.value })} placeholder="Bijv. 35" /></label><label className="field"><span>Langste duurloop <small>km</small></span><input type="number" min="0.1" max="100" step="0.1" value={draft.recentLongestRunKm} readOnly={planLocked} onChange={(event) => setDraft({ ...draft, recentLongestRunKm: event.target.value })} placeholder="Bijv. 18" /></label></div><small className="plan-context-hint">Deze gegevens helpen de startbelasting te beoordelen. Ze passen het schema zelf niet automatisch aan.</small></div>}
-        {role === 'coach' && <button className="button button-primary" disabled={!selectedAthlete}>Schema opslaan voor atleet <Icon name="arrow" size={16} /></button>}
+        {role === 'coach' && <button className="button button-primary" disabled={!selectedAthlete}>Schema opslaan voor {selectedAthlete?.name ?? 'atleet'} <Icon name="arrow" size={16} /></button>}
       </form>
       <aside className="profile-side">
         <div className="strava-card">
