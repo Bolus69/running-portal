@@ -924,14 +924,15 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
                   <div className="wellness-nudge"><span className="wellness-nudge-icon"><Icon name="heart" /></span><div><strong>Hoe is je herstel?</strong><span>Alleen als je wilt delen.</span></div><button aria-label="Herstel invullen" onClick={() => go('wellness')}><Icon name="arrow" size={17} /></button></div>
                 </aside>
               </div>
-            </> : <EmptyPlan onSetup={() => go('profile')} />}
+            </> : role === 'athlete' ? <AthletePlanPending /> : <EmptyPlan onSetup={() => go('profile')} />}
           </>}
 
-          {view === 'plan' && <PlanView plan={plan} activities={data.activities} onWorkout={setExpandedWorkout} expandedWorkout={expandedWorkout} onEnterWorkout={openWorkoutFeedback} />}
+          {view === 'plan' && <PlanView role={role} plan={plan} activities={data.activities} onWorkout={setExpandedWorkout} expandedWorkout={expandedWorkout} onEnterWorkout={openWorkoutFeedback} />}
           {view === 'history' && <HistoryView activities={data.activities} workouts={plan?.weeks.flatMap((week) => week.workouts) ?? []} onEditWorkout={openWorkoutFeedbackById} onAdd={() => setModal('activity')} />}
           {view === 'wellness' && <WellnessView wellness={data.wellness} todayWellness={todayWellness} draft={wellnessDraft} setDraft={setWellnessDraft} onSubmit={saveWellness} />}
           {view === 'profile' && role === 'coach' && data.athletes.length === 0 && <div className="empty-state"><div className="empty-plan-mark"><Icon name="people" size={24} /></div><h3>Nog geen atleten</h3><p>Nodig eerst een atleet uit. Daarna kun je hier diens marathoninstellingen bekijken en beheren.</p><button type="button" className="button button-primary button-small" onClick={() => setModal('invite')}><Icon name="plus" size={15} /> Atleet uitnodigen</button></div>}
-          {view === 'profile' && (role === 'athlete' || profileAthlete) && <ProfileView data={data} role={role} athletes={data.athletes} selectedAthlete={role === 'coach' ? profileAthlete : null} onSelectAthlete={selectProfileAthlete} draft={profileDraft} setDraft={setProfileDraft} paces={paces} onSubmit={role === 'coach' ? saveCoachProfile : savePlan} onConnect={() => { if (!demoMode) router.push('/api/strava/connect'); else showToast('Strava koppelen werkt zodra de app-instellingen zijn aangesloten.') }} onSync={syncStrava} syncingStrava={syncingStrava} onDisconnect={disconnectStrava} demoMode={demoMode} />}
+          {view === 'profile' && role === 'athlete' && !plan && <AthletePlanPending />}
+          {view === 'profile' && ((role === 'athlete' && Boolean(plan)) || (role === 'coach' && Boolean(profileAthlete))) && <ProfileView data={data} role={role} athletes={data.athletes} selectedAthlete={role === 'coach' ? profileAthlete : null} onSelectAthlete={selectProfileAthlete} draft={profileDraft} setDraft={setProfileDraft} paces={paces} onSubmit={role === 'coach' ? saveCoachProfile : savePlan} onConnect={() => { if (!demoMode) router.push('/api/strava/connect'); else showToast('Strava koppelen werkt zodra de app-instellingen zijn aangesloten.') }} onSync={syncStrava} syncingStrava={syncingStrava} onDisconnect={disconnectStrava} demoMode={demoMode} />}
           {view === 'coach' && <CoachView data={data} onAthlete={(athlete) => { setSelectedAthlete(athlete); setView('athlete-detail') }} onSuggestions={() => go('suggestions')} onUpdateSuggestion={updateSuggestion} />}
           {view === 'athletes' && <AthletesView athletes={data.athletes} onAthlete={(athlete) => { setSelectedAthlete(athlete); setView('athlete-detail') }} onInvite={() => setModal('invite')} />}
           {view === 'suggestions' && <SuggestionsView suggestions={data.suggestions} onUpdate={updateSuggestion} onEvaluate={evaluateCoachSuggestions} evaluating={evaluatingSuggestions} />}
@@ -1003,8 +1004,12 @@ function EmptyPlan({ onSetup }: { onSetup: () => void }) {
   return <section className="empty-plan"><div className="empty-plan-mark"><Icon name="plan" size={28} /></div><p className="eyebrow">EEN GOEDE START</p><h2>Stel je marathonplan in</h2><p>Vul je marathondatum, streeftijd en vaste trainingsdagen in. Je krijgt daarna een plan van 12, 16 of 20 weken.</p><button className="button button-primary" onClick={onSetup}>Plan instellen <Icon name="arrow" size={16} /></button></section>
 }
 
-function PlanView({ plan, activities, onWorkout, expandedWorkout, onEnterWorkout }: { plan: DashboardData['plan']; activities: RunActivity[]; onWorkout: (id: string | null) => void; expandedWorkout: string | null; onEnterWorkout: (workout: PlanWeek['workouts'][number]) => void }) {
-  if (!plan) return <EmptyPlan onSetup={() => window.dispatchEvent(new CustomEvent('open-profile'))} />
+function AthletePlanPending() {
+  return <section className="empty-plan"><div className="empty-plan-mark"><Icon name="runner" size={28} /></div><p className="eyebrow">JOUW TRAININGSPLAN</p><h2>Je coach stelt je plan samen</h2><p>Zodra het klaarstaat, zie je hier je trainingen en tempo-informatie. Bespreek vragen of wijzigingen met je coach.</p></section>
+}
+
+function PlanView({ role, plan, activities, onWorkout, expandedWorkout, onEnterWorkout }: { role: AppRole; plan: DashboardData['plan']; activities: RunActivity[]; onWorkout: (id: string | null) => void; expandedWorkout: string | null; onEnterWorkout: (workout: PlanWeek['workouts'][number]) => void }) {
+  if (!plan) return role === 'athlete' ? <AthletePlanPending /> : <EmptyPlan onSetup={() => window.dispatchEvent(new CustomEvent('open-profile'))} />
 
   const today = todayDateISO()
 
