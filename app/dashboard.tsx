@@ -684,11 +684,13 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
 
   async function saveCoachProfile(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!profileAthlete) return showToast('Selecteer eerst een atleet.')
+    const formAthleteId = String(new FormData(event.currentTarget).get('athleteId') ?? '')
+    const selectedAthlete = data.athletes.find((athlete) => athlete.id === formAthleteId)
+    if (!selectedAthlete) return showToast('Selecteer eerst een atleet uit de lijst.')
     const goalSeconds = parseDurationToSeconds(profileDraft.goalTime)
     if (!goalSeconds) return showToast('Gebruik voor de streeftijd uu:mm:ss, bijvoorbeeld 04:00:00.')
     if (profileDraft.days.length !== 3) return showToast('Kies precies drie vaste trainingsdagen.')
-    const effectiveStartDate = profileAthlete.planWeeks?.length ? nextMondayDate() : undefined
+    const effectiveStartDate = selectedAthlete.planWeeks?.length ? nextMondayDate() : undefined
     const recentWeeklyKm = profileDraft.recentWeeklyKm ? Number(profileDraft.recentWeeklyKm) : undefined
     const recentLongestRunKm = profileDraft.recentLongestRunKm ? Number(profileDraft.recentLongestRunKm) : undefined
     const recentRaceDistanceKm = profileDraft.raceDistance ? Number(profileDraft.raceDistance) : undefined
@@ -707,7 +709,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
     } catch (error) {
       return showToast(error instanceof Error ? error.message : 'Het plan kan niet worden opgebouwd.')
     }
-    const displayedWeeks = effectiveStartDate ? mergeRevisedPlanWeeks(profileAthlete.planWeeks ?? [], weeks, effectiveStartDate) : weeks
+    const displayedWeeks = effectiveStartDate ? mergeRevisedPlanWeeks(selectedAthlete.planWeeks ?? [], weeks, effectiveStartDate) : weeks
     const currentPlanWeek = findCurrentPlanWeek(displayedWeeks)
     const currentWeek = currentPlanWeek?.weekNumber ?? currentWeekNumber(displayedWeeks)
     if (!demoMode) {
@@ -715,7 +717,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          athleteId: profileAthlete.id,
+          athleteId: selectedAthlete.id,
           marathonDate: profileDraft.marathonDate,
           planLength: profileDraft.planLength,
           goalTime: profileDraft.goalTime,
@@ -732,7 +734,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
       if (!response.ok) return showToast(result.error ?? 'Het atleetprofiel kon niet worden opgeslagen.')
     }
     const updatedAthlete: AthleteSummary = {
-      ...profileAthlete,
+      ...selectedAthlete,
       marathonDate: profileDraft.marathonDate,
       goalTime: profileDraft.goalTime,
       planLength: profileDraft.planLength,
@@ -745,7 +747,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
       recentLongestRunKm,
       currentWeek,
       phase: currentPlanWeek?.phase ?? 'Basis',
-      plannedThisWeek: effectiveStartDate ? profileAthlete.plannedThisWeek : currentPlanWeek?.workouts.filter((workout) => !workout.optional).length ?? 0,
+      plannedThisWeek: effectiveStartDate ? selectedAthlete.plannedThisWeek : currentPlanWeek?.workouts.filter((workout) => !workout.optional).length ?? 0,
       planWeeks: displayedWeeks,
     }
     setData((current) => ({ ...current, athletes: current.athletes.map((athlete) => athlete.id === updatedAthlete.id ? updatedAthlete : athlete) }))
@@ -1206,7 +1208,7 @@ function ProfileView({ data, role, athletes, selectedAthlete, onSelectAthlete, d
           <span className="profile-avatar">{(role === 'coach' ? selectedAthlete?.name : data.profile.name)?.charAt(0) ?? 'A'}</span>
         </div>
         {role === 'coach'
-          ? <label className="field full"><span>Atleet</span><select aria-label="Atleet selecteren" required value={selectedAthlete?.id ?? ''} onChange={(event) => onSelectAthlete(event.target.value)}><option value="" disabled>Kies een atleet</option>{[...athletes].sort((a, b) => a.name.localeCompare(b.name, 'nl')).map((athlete) => <option key={athlete.id} value={athlete.id}>{athlete.name}{athlete.email ? ' (' + athlete.email + ')' : ''}</option>)}</select></label>
+          ? <label className="field full"><span>Atleet</span><select name="athleteId" aria-label="Atleet selecteren" required value={selectedAthlete?.id ?? ''} onChange={(event) => onSelectAthlete(event.target.value)}><option value="" disabled>Kies een atleet</option>{[...athletes].sort((a, b) => a.name.localeCompare(b.name, 'nl')).map((athlete) => <option key={athlete.id} value={athlete.id}>{athlete.name}{athlete.email ? ' (' + athlete.email + ')' : ''}</option>)}</select></label>
           : <label className="field full"><span>Naam</span><input value={data.profile.name} readOnly /></label>}
         {role === 'coach' && !selectedAthlete ? <p className="plan-timing-note">Selecteer een atleet om diens schema-instellingen te bekijken of aan te passen.</p> : null}
         <div className="form-row">

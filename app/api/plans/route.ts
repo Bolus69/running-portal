@@ -25,7 +25,8 @@ export async function POST(request: Request) {
   let body: Record<string, unknown>
   try { body = await request.json() as Record<string, unknown> } catch { return jsonError('Controleer de ingevulde gegevens.', 400) }
   const targetAthleteId = typeof body.athleteId === 'string' && body.athleteId ? body.athleteId : ''
-  if (!targetAthleteId || targetAthleteId === user.id) return jsonError('Alleen de coach kan een trainingsschema instellen voor een toegewezen atleet.', 403)
+  if (!targetAthleteId) return jsonError('Selecteer eerst een atleet voor het trainingsschema.', 400)
+  if (targetAthleteId === user.id) return jsonError('Je kunt geen schema opslaan voor je eigen coachaccount. Kies een toegewezen atleet.', 403)
   const length = Number(body.planLength)
   const marathonDate = typeof body.marathonDate === 'string' ? body.marathonDate : ''
   const goalSeconds = parseDurationToSeconds(typeof body.goalTime === 'string' ? body.goalTime : '')
