@@ -272,7 +272,7 @@ async function loadCoachData(supabase: Awaited<ReturnType<typeof import('@/lib/s
     athleteIds.length ? supabase.from('coach_notes').select('id,athlete_id,note,created_at').eq('coach_id', userId).in('athlete_id', athleteIds).order('created_at', { ascending: false }).limit(100) : Promise.resolve({ data: [] }),
   ])
   const profiles = ((profileResult.data ?? []) as unknown as Row[])
-  const nameById = new Map(profiles.map((profile) => [String(profile.id), String(profile.full_name ?? 'Atleet')]))
+  const nameById = new Map(profiles.map((profile) => [String(profile.id), String(profile.full_name || 'Atleet')]))
   const { data: athleteStravaRows } = athleteIds.length
     ? await admin.from('strava_connections').select('athlete_id,is_active').in('athlete_id', athleteIds)
     : { data: [] }

@@ -251,7 +251,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
   const [data, setData] = useState(initialData)
   const [role, setRole] = useState<AppRole>(initialData.profile.role)
   const [view, setView] = useState<View>(initialData.profile.role === 'coach' ? 'coach' : 'week')
-  const [modal, setModal] = useState<'activity' | 'invite' | 'plan' | 'feedback' | 'select-athlete' | null>(null)
+  const [modal, setModal] = useState<'activity' | 'invite' | 'plan' | 'feedback' | 'select-athlete' | 'delete-athlete' | null>(null)
   const [feedbackWorkout, setFeedbackWorkout] = useState<PlanWeek['workouts'][number] | null>(null)
   const [feedbackDraft, setFeedbackDraft] = useState<QuickFeedbackDraft>({ effort: '', note: '' })
   const [activityFile, setActivityFile] = useState<File | null>(null)
@@ -266,6 +266,8 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
   const [syncingStrava, setSyncingStrava] = useState(false)
   const [expandedWorkout, setExpandedWorkout] = useState<string | null>(null)
   const [selectedAthlete, setSelectedAthlete] = useState<AthleteSummary | null>(null)
+  const [deleteAthleteConfirmation, setDeleteAthleteConfirmation] = useState('')
+  const [deletingAthlete, setDeletingAthlete] = useState(false)
   const [profileAthleteId, setProfileAthleteId] = useState<string | null>(initialData.profile.role === 'coach' ? null : initialData.athletes[0]?.id ?? null)
   const [draft, setDraft] = useState<ManualDraft>({ name: '', date: todayDateISO(), duration: '', distance: '', heartRate: '', effort: '', note: '', plannedWorkoutId: '' })
   const [lapDrafts, setLapDrafts] = useState<ActivityLap[]>([])
@@ -772,6 +774,43 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
     return true
   }
 
+  async function removeSelectedAthlete() {
+    if (!selectedAthlete || demoMode || deleteAthleteConfirmation.trim() !== selectedAthlete.name.trim()) return
+    setDeletingAthlete(true)
+    try {
+      const response = await fetch('/api/coach/athletes/' + encodeURIComponent(selectedAthlete.id), {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmName: deleteAthleteConfirmation.trim() }),
+      })
+      const result = await response.json().catch(() => ({})) as { error?: string; auditRecorded?: boolean }
+      if (!response.ok) {
+        showToast(result.error ?? 'Het atleetaccount kon niet worden verwijderd. Probeer het opnieuw.')
+        return
+      }
+
+      const removedAthleteId = selectedAthlete.id
+      setData((current) => ({
+        ...current,
+        athletes: current.athletes.filter((athlete) => athlete.id !== removedAthleteId),
+        suggestions: current.suggestions.filter((suggestion) => suggestion.athleteId !== removedAthleteId),
+      }))
+      setSelectedAthlete(null)
+      setProfileAthleteId((current) => current === removedAthleteId ? null : current)
+      setDeleteAthleteConfirmation('')
+      setModal(null)
+      setView('athletes')
+      showToast(result.auditRecorded === false
+        ? 'Atleet en gegevens verwijderd. De interne verwijderregistratie kon niet worden bijgewerkt.'
+        : 'Atleet en alle bijbehorende Marathon Coach-gegevens zijn definitief verwijderd.')
+      router.refresh()
+    } catch {
+      showToast('Geen verbinding. Het atleetaccount kon niet worden verwijderd; probeer het opnieuw.')
+    } finally {
+      setDeletingAthlete(false)
+    }
+  }
+
   async function evaluateCoachSuggestions() {
     if (demoMode) return showToast('In dit voorbeeld staan al twee voorstellen klaar om te bekijken.')
     setEvaluatingSuggestions(true)
@@ -936,7 +975,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
           {view === 'coach' && <CoachView data={data} onAthlete={(athlete) => { setSelectedAthlete(athlete); setView('athlete-detail') }} onSuggestions={() => go('suggestions')} onUpdateSuggestion={updateSuggestion} />}
           {view === 'athletes' && <AthletesView athletes={data.athletes} onAthlete={(athlete) => { setSelectedAthlete(athlete); setView('athlete-detail') }} onInvite={() => setModal('invite')} />}
           {view === 'suggestions' && <SuggestionsView suggestions={data.suggestions} onUpdate={updateSuggestion} onEvaluate={evaluateCoachSuggestions} evaluating={evaluatingSuggestions} />}
-          {view === 'athlete-detail' && selectedAthlete && <AthleteDetail athlete={selectedAthlete} data={data} onBack={() => go('athletes')} onSetupPlan={() => openCoachPlan(selectedAthlete)} onAddNote={addCoachNote} />}
+          {view === 'athlete-detail' && selectedAthlete && <AthleteDetail athlete={selectedAthlete} data={data} onBack={() => go('athletes')} onSetupPlan={() => openCoachPlan(selectedAthlete)} onAddNote={addCoachNote} onRemove={() => { setDeleteAthleteConfirmation(''); setModal('delete-athlete') }} canRemove={!demoMode} />}
         </div>
         <footer className="page-footer"><span>{BRAND.appName} <b>·</b> {BRAND.byline}</span><span>Trainingsschema is een richtlijn, geen diagnose.</span></footer>
       </main>
@@ -959,6 +998,11 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
         <div className="modal-actions full"><button type="button" className="button button-outline" onClick={() => setModal(null)} disabled={savingWorkoutFeedback}>Annuleren</button><button className="button button-primary" disabled={savingWorkoutFeedback}>{savingWorkoutFeedback ? 'Opslaan…' : selectedStravaCandidateId ? feedbackLinkedActivity ? 'Strava koppelen en huidige activiteit vervangen' : 'Afronden en Strava-activiteit koppelen' : feedbackWorkout.status === 'completed' ? activityFile ? 'Feedback en bestand opslaan' : 'Feedback opslaan' : activityFile ? 'Afronden en bestand uploaden' : 'Training afronden'}</button></div>
       </form></Modal>}
       {modal === 'select-athlete' && <Modal title="Training toevoegen" subtitle="Kies een atleet om de trainingsplanning in te stellen of bij te werken." onClose={() => setModal(null)}><div className="athlete-picker-list">{data.athletes.length ? data.athletes.map((athlete) => <button type="button" className="athlete-picker-option" key={athlete.id} onClick={() => openCoachPlan(athlete)}><span className="athlete-avatar">{athlete.name.split(' ').map((part) => part[0]).slice(0, 2).join('')}</span><span><strong>{athlete.name}</strong><small>{athlete.email || 'Geen e-mailadres bekend'}</small></span><Icon name="arrow" size={17} /></button>) : <div className="empty-small"><strong>Je hebt nog geen atleten</strong><span>Nodig eerst een atleet uit om een trainingsplan te maken.</span><button type="button" className="button button-primary button-small" onClick={() => setModal('invite')}>Atleet uitnodigen</button></div>}</div></Modal>}
+      {modal === 'delete-athlete' && selectedAthlete && <Modal title="Atleet definitief verwijderen?" subtitle="Dit verwijdert het Marathon Coach-account en alle gegevens van deze atleet." onClose={() => { if (!deletingAthlete) { setModal(null); setDeleteAthleteConfirmation('') } }}>
+        <div className="delete-athlete-warning"><strong>{selectedAthlete.name}</strong><p>Het schema, alle trainingen en feedback, activiteiten, herstelgegevens, coachnotities, voorstellen en Strava-koppeling worden definitief verwijderd. De atleet verdwijnt ook uit eventuele andere coachgroepen. Dit kan niet ongedaan worden gemaakt.</p></div>
+        <label className="field full delete-athlete-confirm-field"><span>Typ de naam exact om te bevestigen</span><input autoComplete="off" value={deleteAthleteConfirmation} onChange={(event) => setDeleteAthleteConfirmation(event.target.value)} /></label>
+        <div className="modal-actions full"><button type="button" className="button button-outline" onClick={() => { setModal(null); setDeleteAthleteConfirmation('') }} disabled={deletingAthlete}>Annuleren</button><button type="button" className="button button-danger" onClick={removeSelectedAthlete} disabled={deletingAthlete || deleteAthleteConfirmation.trim() !== selectedAthlete.name.trim()}>{deletingAthlete ? 'Verwijderen…' : 'Definitief verwijderen'}</button></div>
+      </Modal>}
       {modal === 'invite' && <Modal title="Atleet uitnodigen" subtitle="De atleet krijgt een e-mail om een eigen account te maken." onClose={() => setModal(null)}><form className="form-grid" onSubmit={inviteAthlete}><label className="field full"><span>Naam</span><input name="name" placeholder="Naam van de atleet" /></label><label className="field full"><span>E-mailadres *</span><input name="email" type="email" required placeholder="naam@voorbeeld.nl" /></label><div className="invite-note full"><Icon name="shield" size={18} /><span>Iedere atleet ziet alleen het eigen profiel en de eigen trainingsgegevens.</span></div><div className="modal-actions full"><button type="button" className="button button-outline" onClick={() => setModal(null)}>Annuleren</button><button className="button button-primary">Uitnodiging versturen</button></div></form></Modal>}
       {modal === 'plan' && selectedAthlete && <Modal title="Marathonplan instellen" subtitle={'Maak een persoonlijk schema voor ' + selectedAthlete.name + '.'} onClose={() => setModal(null)}><form className="form-grid" onSubmit={saveCoachPlan}>
         <label className="field"><span>Marathondatum</span><input type="date" min={todayDateISO()} required value={coachPlanDraft.marathonDate} onChange={(event) => setCoachPlanDraft({ ...coachPlanDraft, marathonDate: event.target.value })} /></label>
@@ -1506,7 +1550,7 @@ function SuggestionsView({ suggestions, onUpdate, onEvaluate, evaluating }: { su
   return <section className="suggestions-page"><div className="section-heading"><div><p className="eyebrow">BEOORDELING DOOR DE COACH</p><h2>Wijzigingen blijven jouw keuze</h2></div><div className="form-actions"><span className="proposal-count">{suggestions.filter((item) => item.status === 'pending').length} open</span><button className="button button-outline button-small" onClick={onEvaluate} disabled={evaluating}>{evaluating ? 'Controleren…' : 'Voorstellen controleren'}</button></div></div><div className="suggestion-list">{suggestions.map((item) => <SuggestionCard key={item.id} suggestion={item} onUpdate={onUpdate} />)}</div>{suggestions.length === 0 && <div className="empty-state"><h3>Geen voorstellen</h3><p>Als feedback of verloop aandacht vraagt, verschijnt een voorstel hier.</p></div>}</section>
 }
 
-function AthleteDetail({ athlete, data, onBack, onSetupPlan, onAddNote }: { athlete: AthleteSummary; data: DashboardData; onBack: () => void; onSetupPlan: () => void; onAddNote: (note: string) => Promise<boolean> }) {
+function AthleteDetail({ athlete, data, onBack, onSetupPlan, onAddNote, onRemove, canRemove }: { athlete: AthleteSummary; data: DashboardData; onBack: () => void; onSetupPlan: () => void; onAddNote: (note: string) => Promise<boolean>; onRemove: () => void; canRemove: boolean }) {
   const [noteDraft, setNoteDraft] = useState('')
   const recent = (athlete.activities ?? data.activities).slice(0, 30)
   const planWeeks = athlete.planWeeks ?? []
@@ -1553,6 +1597,7 @@ function AthleteDetail({ athlete, data, onBack, onSetupPlan, onAddNote }: { athl
     <div className="section-heading"><div><p className="eyebrow">LAATSTE 30 DAGEN</p><h2>Trainingsgeschiedenis</h2></div></div>
     <div className="history-list compact-history">{recent.map((activity) => { const linkedWorkout = activity.plannedWorkoutId ? planWeeks.flatMap((week) => week.workouts).find((workout) => workout.id === activity.plannedWorkoutId) : undefined; return <div className="history-card" key={activity.id}><div className={'history-activity-icon' + (linkedWorkout ? ' type-' + linkedWorkout.type : '')}><Icon name={linkedWorkout ? workoutIconName(linkedWorkout.type) : 'runner'} size={18} /></div><div className="history-main"><div className="history-title-row"><h3>{activity.name}</h3><span className={'source-pill source-' + activity.source}>{activitySourceLabel(activity.source)}</span></div><div className="history-meta"><span>{dateLabel(activity.startedAt)}</span><span>{activity.distanceKm ? activity.distanceKm.toFixed(1).replace('.', ',') + ' km' : '—'}</span><span>{activity.durationMinutes} min</span>{activity.pace && <span>{activity.pace} /km</span>}</div>{activity.effort && <p className="history-feedback"><span>Gevoel</span>{effortLabel(activity.effort)}</p>}{activity.note && <p className="history-note">{activity.note}</p>}</div></div>})}</div>
     <p className="plan-disclaimer"><Icon name="shield" size={16} /> Herstelgegevens zijn alleen zichtbaar als de atleet deze met jou deelt.</p>
+    {canRemove && <section className="delete-athlete-zone" aria-labelledby="delete-athlete-heading"><div><p className="eyebrow">GEVOELIGE ACTIE</p><h2 id="delete-athlete-heading">Atleetaccount verwijderen</h2><p>Verwijdert het Marathon Coach-account en alle gekoppelde gegevens definitief.</p></div><button type="button" className="button button-danger button-small" onClick={onRemove}>Atleet verwijderen</button></section>}
   </section>
 }
 function Modal({ title, subtitle, onClose, children }: { title: string; subtitle: string; onClose: () => void; children: React.ReactNode }) {
