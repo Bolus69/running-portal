@@ -7,8 +7,9 @@ export async function POST(request: Request) {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return jsonError('Log opnieuw in om een atleet uit te nodigen.', 401)
-  const { data: coachRole } = await supabase.from('coach_roles').select('user_id').eq('user_id', user.id).maybeSingle()
-  if (!coachRole) return jsonError('Alleen toegewezen coaches kunnen een atleet uitnodigen.', 403)
+  const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+  if (profileError) return jsonError('Je coachrechten konden niet worden gecontroleerd. Vernieuw de pagina en probeer het opnieuw.', 503)
+  if (profile?.role !== 'coach') return jsonError('Alleen coaches kunnen een atleet uitnodigen.', 403)
 
   let body: { email?: string; name?: string }
   try { body = await request.json() as { email?: string; name?: string } } catch { return jsonError('Controleer de uitnodigingsgegevens.', 400) }
@@ -17,6 +18,14 @@ export async function POST(request: Request) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return jsonError('Vul een geldig e-mailadres in.', 400)
   let admin
   try { admin = createAdminSupabaseClient() } catch { return jsonError('De beveiligde uitnodigingsfunctie is nog niet ingesteld.', 503) }
+  // The coach UI uses profiles.role as its source of truth. Keep the separate
+  // coach_roles grant in sync so other coach routes and RLS policies agree.
+  const { error: coachRoleError } = await admin.from('coach_roles').upsert(
+    { user_id: user.id },
+    { onConflict: 'user_id', ignoreDuplicates: true },
+  )
+  if (coachRoleError) return jsonError('Je coachrechten konden niet worden klaargezet. Probeer het later opnieuw.', 503)
+
   const requestOrigin = new URL(request.url).origin
   const configuredPreviewUrl = process.env.VERCEL_ENV === 'preview'
     ? process.env.STRAVA_WEBHOOK_CALLBACK_ORIGIN || process.env.NEXT_PUBLIC_APP_URL
