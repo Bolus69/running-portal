@@ -1017,7 +1017,11 @@ function PlanView({ role, athleteName, plan, activities, onWorkout, expandedWork
   useEffect(() => {
     if (!showExportChoice) return
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') closeExportChoice()
+      if (event.key === 'Escape') {
+        setShowExportChoice(false)
+        setExportError('')
+        window.requestAnimationFrame(() => exportTriggerRef.current?.focus())
+      }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
