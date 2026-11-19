@@ -7,9 +7,9 @@ export async function POST(request: Request) {
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return jsonError('Log opnieuw in om een atleet uit te nodigen.', 401)
-  const { data: profile, error: profileError } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
-  if (profileError) return jsonError('Je coachrechten konden niet worden gecontroleerd. Vernieuw de pagina en probeer het opnieuw.', 503)
-  if (profile?.role !== 'coach') return jsonError('Alleen coaches kunnen een atleet uitnodigen.', 403)
+  const { data: coachProfile, error: coachProfileError } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+  if (coachProfileError) return jsonError('Je coachrechten konden niet worden gecontroleerd. Vernieuw de pagina en probeer het opnieuw.', 503)
+  if (coachProfile?.role !== 'coach') return jsonError('Alleen coaches kunnen een atleet uitnodigen.', 403)
 
   let body: { email?: string; name?: string }
   try { body = await request.json() as { email?: string; name?: string } } catch { return jsonError('Controleer de uitnodigingsgegevens.', 400) }
