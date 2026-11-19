@@ -846,7 +846,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
       if (!response.ok) return showToast(result.error ?? 'Uitnodigen lukte niet. Probeer opnieuw.')
     }
     setModal(null)
-    showToast(demoMode ? 'Demo: dit is alleen een voorbeeld; er wordt geen e-mail verstuurd.' : 'Uitnodiging aangevraagd voor ' + email + '. Controleer ook je spammap.')
+    showToast(demoMode ? 'Demo: dit is alleen een voorbeeld; er wordt geen e-mail verstuurd.' : 'Uitnodiging aangevraagd voor ' + email + '.')
   }
 
   function openCoachPlan(athlete: AthleteSummary) {
@@ -927,7 +927,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
             </> : role === 'athlete' ? <AthletePlanPending /> : <EmptyPlan onSetup={() => go('profile')} />}
           </>}
 
-          {view === 'plan' && <PlanView role={role} plan={plan} activities={data.activities} onWorkout={setExpandedWorkout} expandedWorkout={expandedWorkout} onEnterWorkout={openWorkoutFeedback} />}
+          {view === 'plan' && <PlanView role={role} athleteName={data.profile.name} plan={plan} activities={data.activities} onWorkout={setExpandedWorkout} expandedWorkout={expandedWorkout} onEnterWorkout={openWorkoutFeedback} />}
           {view === 'history' && <HistoryView activities={data.activities} workouts={plan?.weeks.flatMap((week) => week.workouts) ?? []} onEditWorkout={openWorkoutFeedbackById} onAdd={() => setModal('activity')} />}
           {view === 'wellness' && <WellnessView wellness={data.wellness} todayWellness={todayWellness} draft={wellnessDraft} setDraft={setWellnessDraft} onSubmit={saveWellness} />}
           {view === 'profile' && role === 'coach' && data.athletes.length === 0 && <div className="empty-state"><div className="empty-plan-mark"><Icon name="people" size={24} /></div><h3>Nog geen atleten</h3><p>Nodig eerst een atleet uit. Daarna kun je hier diens marathoninstellingen bekijken en beheren.</p><button type="button" className="button button-primary button-small" onClick={() => setModal('invite')}><Icon name="plus" size={15} /> Atleet uitnodigen</button></div>}
@@ -1008,10 +1008,75 @@ function AthletePlanPending() {
   return <section className="empty-plan"><div className="empty-plan-mark"><Icon name="runner" size={28} /></div><p className="eyebrow">JOUW TRAININGSPLAN</p><h2>Je coach stelt je plan samen</h2><p>Zodra het klaarstaat, zie je hier je trainingen en tempo-informatie. Bespreek vragen of wijzigingen met je coach.</p></section>
 }
 
-function PlanView({ role, plan, activities, onWorkout, expandedWorkout, onEnterWorkout }: { role: AppRole; plan: DashboardData['plan']; activities: RunActivity[]; onWorkout: (id: string | null) => void; expandedWorkout: string | null; onEnterWorkout: (workout: PlanWeek['workouts'][number]) => void }) {
+function PlanView({ role, athleteName, plan, activities, onWorkout, expandedWorkout, onEnterWorkout }: { role: AppRole; athleteName: string; plan: DashboardData['plan']; activities: RunActivity[]; onWorkout: (id: string | null) => void; expandedWorkout: string | null; onEnterWorkout: (workout: PlanWeek['workouts'][number]) => void }) {
+  const [showExportChoice, setShowExportChoice] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
+  const [exportError, setExportError] = useState('')
+  const exportTriggerRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (!showExportChoice) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeExportChoice()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [showExportChoice])
+
+  function closeExportChoice() {
+    setShowExportChoice(false)
+    setExportError('')
+    window.requestAnimationFrame(() => exportTriggerRef.current?.focus())
+  }
+
   if (!plan) return role === 'athlete' ? <AthletePlanPending /> : <EmptyPlan onSetup={() => window.dispatchEvent(new CustomEvent('open-profile'))} />
 
   const today = todayDateISO()
+
+  async function exportPlan(format: 'pdf' | 'word') {
+    let printWindow: Window | null = null
+    if (format === 'pdf') {
+      printWindow = window.open('', '_blank')
+      if (!printWindow) {
+        setExportError('Het afdrukvenster kon niet worden geopend. Sta pop-ups voor deze site toe en probeer opnieuw.')
+        return
+      }
+    }
+
+    setIsExporting(true)
+    setExportError('')
+    try {
+      const logoDataUrl = await loadPlanLogoDataUrl()
+      const html = buildPlanExportHtml(plan, athleteName, logoDataUrl)
+      if (format === 'pdf' && printWindow) {
+        const targetWindow = printWindow
+        targetWindow.document.open()
+        targetWindow.document.write(html)
+        targetWindow.document.close()
+        targetWindow.focus()
+        window.setTimeout(() => {
+          targetWindow.focus()
+          targetWindow.print()
+        }, 400)
+      } else {
+        const blob = new Blob(['\ufeff', html], { type: 'application/msword;charset=utf-8' })
+        const objectUrl = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = objectUrl
+        link.download = 'Marathonschema-' + safePlanFileName(athleteName) + '.doc'
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
+      }
+      closeExportChoice()
+    } catch {
+      printWindow?.close()
+      setExportError('Het schema kon niet worden klaargemaakt. Probeer het opnieuw.')
+    } finally {
+      setIsExporting(false)
+    }
+  }
 
   return (
     <section className="plan-page">
@@ -1022,6 +1087,7 @@ function PlanView({ role, plan, activities, onWorkout, expandedWorkout, onEnterW
           <p>Doel {formatTime(plan.goalTime)} · drie vaste trainingen{plan.includeOptionalFourth ? ' plus één optionele training' : ''}</p>
           <small className="plan-entry-hint">Ook trainingen uit eerdere weken kun je later invullen. Open een training om deze af te ronden of feedback toe te voegen.</small>
           {(plan.recentWeeklyKm || plan.recentLongestRunKm) && <small className="plan-entry-hint plan-baseline">Startpunt ingevuld: {plan.recentWeeklyKm ? plan.recentWeeklyKm + ' km per week' : ''}{plan.recentWeeklyKm && plan.recentLongestRunKm ? ' · ' : ''}{plan.recentLongestRunKm ? 'langste duurloop ' + plan.recentLongestRunKm + ' km' : ''}. Bespreek met je coach of de startweken hierbij passen.</small>}
+          {role === 'athlete' && <div className="plan-overview-export-row"><button ref={exportTriggerRef} type="button" className="button button-outline plan-export-trigger" onClick={() => { setExportError(''); setShowExportChoice(true) }}>Schema afdrukken</button></div>}
         </div>
         <div className="plan-overview-icon"><Icon name="runner" size={24} /></div>
       </div>
@@ -1060,9 +1126,88 @@ function PlanView({ role, plan, activities, onWorkout, expandedWorkout, onEnterW
         ))}
       </div>
       <p className="plan-disclaimer"><Icon name="shield" size={16} /> Schema is een flexibel uitgangspunt. Bespreek wijzigingen of aanhoudende klachten met je coach.</p>
+      {showExportChoice && <div className="modal-backdrop plan-export-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeExportChoice() }}>
+        <section className="modal-card plan-export-modal" role="dialog" aria-modal="true" aria-labelledby="plan-export-title" aria-describedby="plan-export-description">
+          <div className="modal-heading"><div><p className="eyebrow">JOUW SCHEMA</p><h2 id="plan-export-title">Schema afdrukken</h2><p id="plan-export-description">Kies een bestandsvorm voor het volledige trainingsschema.</p></div><button type="button" className="icon-quiet modal-close" aria-label="Venster sluiten" onClick={closeExportChoice}><Icon name="close" size={17} /></button></div>
+          <div className="plan-export-options">
+            <button type="button" className="plan-export-choice" disabled={isExporting} onClick={() => exportPlan('pdf')}><strong>PDF maken</strong><span>Opent het afdrukvenster. Kies daar ‘Opslaan als PDF’.</span></button>
+            <button type="button" className="plan-export-choice" disabled={isExporting} onClick={() => exportPlan('word')}><strong>Word downloaden</strong><span>Downloadt een bewerkbaar Word-document.</span></button>
+          </div>
+          {isExporting && <p className="plan-export-status" role="status">Het schema wordt klaargemaakt…</p>}
+          {exportError && <p className="plan-export-error" role="alert">{exportError}</p>}
+          <div className="modal-actions"><button type="button" className="button button-outline button-small" disabled={isExporting} onClick={closeExportChoice}>Annuleren</button></div>
+        </section>
+      </div>}
     </section>
   )
 }
+
+function escapePlanExportHtml(value: unknown): string {
+  const entities: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
+  return String(value ?? '').replace(/[&<>"']/g, (character) => entities[character])
+}
+
+function safePlanFileName(value: string): string {
+  const normalized = value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  return normalized.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'atleet'
+}
+
+async function loadPlanLogoDataUrl(): Promise<string> {
+  const response = await fetch('/marathon-coach-mark.png')
+  if (!response.ok) throw new Error('Logo niet beschikbaar')
+  const blob = await response.blob()
+  const bytes = new Uint8Array(await blob.arrayBuffer())
+  let binary = ''
+  bytes.forEach((byte) => { binary += String.fromCharCode(byte) })
+  return 'data:' + (blob.type || 'image/png') + ';base64,' + window.btoa(binary)
+}
+
+function buildPlanExportHtml(plan: NonNullable<DashboardData['plan']>, athleteName: string, logoDataUrl: string): string {
+  const esc = escapePlanExportHtml
+  const weeksHtml = plan.weeks.map((week) => {
+    const workoutsHtml = week.workouts.map((workout) => {
+      const workload = workout.durationMinutes ? workout.durationMinutes + ' min' : workout.distanceKm ? workout.distanceKm + ' km' : 'Duur niet opgegeven'
+      const intensity = paceIntensityLabel(workout.intensity)
+      const stepsHtml = workout.steps?.length
+        ? '<ul class="steps">' + workout.steps.map((step) => '<li>' + esc(step.label + (step.repeats ? ' · ' + step.repeats + '×' : '') + (step.durationMinutes ? ' · ' + step.durationMinutes + ' min' : '') + (step.intensity ? ' · ' + paceIntensityLabel(step.intensity) : '')) + '</li>').join('') + '</ul>'
+        : ''
+      return '<article class="workout"><div class="workout-heading"><div><h3>' + esc(workoutTitleLabel(workout.title)) + (workout.optional ? ' <span class="optional">Optioneel</span>' : '') + '</h3><p class="workout-date">' + esc(dateLabel(workout.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })) + '</p></div><strong class="workload">' + esc(workload) + '</strong></div>' +
+        (intensity ? '<p class="intensity">' + esc(intensity) + '</p>' : '') +
+        (workout.goal ? '<p><strong>Doel:</strong> ' + esc(workout.goal) + '</p>' : '') +
+        (workout.description ? '<p>' + esc(workout.description) + '</p>' : '') + stepsHtml + '</article>'
+    }).join('')
+    return '<section class="week"><div class="week-heading"><span>WEEK ' + esc(String(week.weekNumber).padStart(2, '0')) + '</span><h2>' + esc(phaseLabel(week.phase)) + (week.historical ? ' <small>· eerdere planning</small>' : '') + (week.isRecoveryWeek ? ' <small>· herstelweek</small>' : '') + '</h2><p>' + esc(week.goal) + '</p></div>' +
+      (workoutsHtml || '<p class="empty-week">Geen trainingen in deze week.</p>') + '</section>'
+  }).join('')
+
+  const generatedDate = dateLabel(todayDateISO(), { day: 'numeric', month: 'long', year: 'numeric' })
+  const css = [
+    '@page{size:A4;margin:15mm 14mm 17mm}',
+    '*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}',
+    'body{margin:0;color:#183247;font:10pt/1.5 Arial,Helvetica,sans-serif}',
+    '.document{max-width:850px;margin:0 auto}',
+    '.brand{display:flex;align-items:center;gap:14px;border-bottom:5px solid #d5f36b;padding:0 0 14px;margin-bottom:22px}',
+    '.brand img{width:56px;height:56px;object-fit:contain}',
+    '.brand-copy{flex:1}.brand-copy strong{display:block;font-size:18pt;line-height:1.1}.brand-copy span{display:block;margin-top:4px;color:#63798b;font-size:9pt}',
+    '.kicker{margin:0 0 5px;color:#63798b;font-size:8pt;font-weight:bold;letter-spacing:1.3px;text-transform:uppercase}',
+    'h1{margin:0;color:#183247;font-size:23pt;line-height:1.15} .subtitle{margin:7px 0 0;color:#63798b;font-size:10pt}',
+    '.meta{display:flex;gap:10px;margin:18px 0 23px}.meta div{flex:1;padding:11px 13px;border:1px solid #dae4ec;border-radius:8px;background:#f5f8fa}.meta span{display:block;color:#63798b;font-size:8pt}.meta strong{display:block;margin-top:3px;font-size:11pt}',
+    '.section-title{margin:0 0 10px;color:#183247;font-size:14pt}',
+    '.week{margin:12px 0 16px;border:1px solid #dae4ec;border-radius:9px;overflow:hidden;page-break-inside:avoid;break-inside:avoid}',
+    '.week-heading{padding:11px 14px;background:#edf4f7;border-left:5px solid #d5f36b}.week-heading>span{color:#63798b;font-size:8pt;font-weight:bold;letter-spacing:1px}.week-heading h2{display:inline;margin:0 0 0 8px;font-size:13pt}.week-heading h2 small{color:#63798b;font-size:8pt;font-weight:normal}.week-heading p{margin:3px 0 0;color:#456176}',
+    '.workout{padding:10px 14px;border-top:1px solid #e7edf1;page-break-inside:avoid;break-inside:avoid}.workout-heading{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.workout h3{margin:0;font-size:11pt}.workout-date{margin:2px 0 0;color:#63798b;font-size:9pt}.workload{color:#183247;white-space:nowrap}.optional{display:inline-block;margin-left:5px;padding:2px 6px;border-radius:9px;background:#eff8d7;color:#536c43;font-size:7pt;vertical-align:middle}.intensity{margin:5px 0;color:#456176;font-size:9pt;font-weight:bold}.workout p{margin:5px 0}.steps{margin:5px 0 0;padding-left:17px;color:#456176}.steps li{margin:2px 0}.empty-week{padding:12px 14px;color:#63798b}',
+    '.footer{margin-top:24px;padding-top:12px;border-top:2px solid #d5f36b;color:#456176;font-size:8.5pt}.footer p{margin:4px 0}.footer strong{color:#183247}.generated{margin-top:12px;color:#8396a7;font-size:8pt}',
+    '@media print{.document{max-width:none}.week{page-break-inside:avoid;break-inside:avoid}}'
+  ].join('')
+  return '<!doctype html><html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Marathonschema - ' + esc(athleteName) + '</title><style>' + css + '</style></head><body><main class="document">' +
+    '<header class="brand"><img src="' + esc(logoDataUrl) + '" alt="Marathon Coach-logo"><div class="brand-copy"><strong>Marathon Coach</strong><span>Persoonlijk marathonschema</span></div></header>' +
+    '<p class="kicker">JOUW TRAININGSPLAN</p><h1>Marathonschema voor ' + esc(athleteName) + '</h1><p class="subtitle">Een persoonlijk schema, ingesteld door je coach.</p>' +
+    '<div class="meta"><div><span>Marathondatum</span><strong>' + esc(dateLabel(plan.marathonDate, { day: 'numeric', month: 'long', year: 'numeric' })) + '</strong></div><div><span>Doeltijd</span><strong>' + esc(formatTime(plan.goalTime)) + '</strong></div><div><span>Opbouw</span><strong>' + esc(String(plan.length)) + ' weken</strong></div></div>' +
+    '<h2 class="section-title">Trainingsweken</h2>' + weeksHtml +
+    '<footer class="footer"><p><strong>Opbouw:</strong> Dit schema is gebaseerd op de trainingsopbouw van All4Running en door je coach ingesteld voor jouw doel en situatie. Dit is geen officieel All4Running-document.</p><p><strong>Belangrijk:</strong> Dit schema is een richtlijn en geen medisch advies. Pas trainingen aan bij klachten of herstelproblemen en bespreek twijfel met je coach.</p><p class="generated">Aangemaakt op ' + esc(generatedDate) + ' · Marathon Coach</p></footer>' +
+    '</main></body></html>'
+}
+
 
 function LinkedActivitySummary({ activity }: { activity: RunActivity }) {
   const details = [
