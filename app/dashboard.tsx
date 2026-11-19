@@ -1038,6 +1038,7 @@ function PlanView({ role, athleteName, plan, activities, onWorkout, expandedWork
   const today = todayDateISO()
 
   async function exportPlan(format: 'pdf' | 'word') {
+    if (!plan) return
     let printWindow: Window | null = null
     if (format === 'pdf') {
       printWindow = window.open('', '_blank')
