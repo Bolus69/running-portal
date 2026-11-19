@@ -1052,7 +1052,7 @@ function PlanView({ role, athleteName, plan, activities, onWorkout, expandedWork
     setExportError('')
     try {
       const logoDataUrl = await loadPlanLogoDataUrl()
-      const html = buildPlanExportHtml(plan, athleteName, logoDataUrl)
+      const html = format === 'pdf' ? buildPlanExportHtml(plan, athleteName, logoDataUrl) : buildPlanWordHtml(plan, athleteName, logoDataUrl)
       if (format === 'pdf' && printWindow) {
         const targetWindow = printWindow
         targetWindow.document.open()
@@ -1213,6 +1213,90 @@ function buildPlanExportHtml(plan: NonNullable<DashboardData['plan']>, athleteNa
     '</main></body></html>'
 }
 
+
+
+function buildPlanWordHtml(plan: NonNullable<DashboardData['plan']>, athleteName: string, logoDataUrl: string): string {
+  const esc = escapePlanExportHtml
+  const css = [
+    '@page WordSection1{size:595.3pt 841.9pt;margin:42pt 43pt 46pt;mso-header-margin:18pt;mso-footer-margin:18pt}',
+    'div.WordSection1{page:WordSection1}',
+    'body{margin:0;font-family:Arial,Helvetica,sans-serif;font-size:10pt;line-height:1.35;color:#183247}',
+    'p{mso-margin-top-alt:0;mso-margin-bottom-alt:0}',
+    'table{border-collapse:collapse;mso-table-lspace:0pt;mso-table-rspace:0pt}',
+    'td{font-family:Arial,Helvetica,sans-serif}',
+    '.page-title{mso-pagination:keep-with-next}'
+  ].join('')
+  const logo = '<img src="' + esc(logoDataUrl) + '" width="54" height="54" alt="Marathon Coach-logo" style="display:block;width:54px;height:54px;border:0"/>'
+
+  const weeksHtml = plan.weeks.map((week) => {
+    const workoutsHtml = week.workouts.map((workout) => {
+      const workload = workout.durationMinutes ? workout.durationMinutes + ' min' : workout.distanceKm ? workout.distanceKm + ' km' : 'Duur niet opgegeven'
+      const intensity = paceIntensityLabel(workout.intensity)
+      const optional = workout.optional ? ' · OPTIONEEL' : ''
+      const stepsHtml = workout.steps?.length
+        ? '<tr><td colspan="2" style="padding:1pt 8pt 8pt 8pt"><p style="margin:0 0 3pt 0;font-size:8pt;font-weight:bold;color:#63798b">BLOKKEN</p>' +
+          workout.steps.map((step) => '<p style="margin:1pt 0;font-size:9pt;color:#456176">• ' + esc(step.label + (step.repeats ? ' · ' + step.repeats + '×' : '') + (step.durationMinutes ? ' · ' + step.durationMinutes + ' min' : '') + (step.intensity ? ' · ' + paceIntensityLabel(step.intensity) : '')) + '</p>').join('') +
+          '</td></tr>'
+        : ''
+      return '<table width="100%" border="0" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;page-break-inside:avoid;margin:0">' +
+        '<tr>' +
+        '<td width="76%" valign="top" style="width:76%;padding:8pt 7pt 3pt 8pt;border-bottom:1px solid #dfe7ec">' +
+        '<p style="margin:0;font-size:10.5pt;font-weight:bold;color:#183247">' + esc(workoutTitleLabel(workout.title) + optional) + '</p>' +
+        '<p style="margin:2pt 0 0 0;font-size:8.5pt;color:#63798b">' + esc(dateLabel(workout.date, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })) + '</p>' +
+        '</td>' +
+        '<td width="24%" valign="top" align="right" style="width:24%;padding:8pt 8pt 3pt 4pt;border-bottom:1px solid #dfe7ec">' +
+        '<p style="margin:0;font-size:10pt;font-weight:bold;color:#183247">' + esc(workload) + '</p>' +
+        (intensity ? '<p style="margin:2pt 0 0 0;font-size:8pt;color:#456176">' + esc(intensity) + '</p>' : '') +
+        '</td>' +
+        '</tr>' +
+        ((workout.goal || workout.description) ? '<tr><td colspan="2" style="padding:4pt 8pt 3pt 8pt">' +
+          (workout.goal ? '<p style="margin:0 0 2pt 0;font-size:9pt;color:#183247"><b>Doel:</b> ' + esc(workout.goal) + '</p>' : '') +
+          (workout.description ? '<p style="margin:0;font-size:9pt;color:#456176">' + esc(workout.description) + '</p>' : '') +
+          '</td></tr>' : '') +
+        stepsHtml +
+        '</table>'
+    }).join('')
+
+    const weekLabel = 'WEEK ' + String(week.weekNumber).padStart(2, '0') + '  ·  ' + phaseLabel(week.phase) +
+      (week.historical ? '  ·  Eerdere planning' : '') + (week.isRecoveryWeek ? '  ·  Herstelweek' : '')
+    return '<table width="100%" border="0" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin:13pt 0 0 0;page-break-inside:avoid">' +
+      '<tr><td width="5" bgcolor="#D5F36B" style="width:5pt;background:#D5F36B;font-size:1pt">&nbsp;</td>' +
+      '<td bgcolor="#EDF4F7" style="padding:7pt 9pt;background:#EDF4F7">' +
+      '<p style="margin:0;font-size:8pt;font-weight:bold;letter-spacing:1pt;color:#63798b;mso-pagination:keep-with-next">' + esc(weekLabel) + '</p>' +
+      '<p style="margin:2pt 0 0 0;font-size:10pt;font-weight:bold;color:#183247;mso-pagination:keep-with-next">' + esc(week.goal) + '</p>' +
+      '</td></tr></table>' +
+      (workoutsHtml || '<p style="margin:7pt 8pt;font-size:9pt;color:#63798b">Geen trainingen in deze week.</p>')
+  }).join('')
+
+  const generatedDate = dateLabel(todayDateISO(), { day: 'numeric', month: 'long', year: 'numeric' })
+  return '<!DOCTYPE html><html lang="nl-NL" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head>' +
+    '<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/><meta name="ProgId" content="Word.Document"/>' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1"/><title>Marathonschema - ' + esc(athleteName) + '</title><style>' + css + '</style></head><body>' +
+    '<div class="WordSection1">' +
+    '<table width="100%" border="0" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse"><tr>' +
+    '<td width="64" valign="middle" style="width:64pt;padding:0 9pt 0 0">' + logo + '</td>' +
+    '<td valign="middle" style="padding:0"><p style="margin:0;font-size:16pt;font-weight:bold;color:#183247">Marathon Coach</p><p style="margin:2pt 0 0 0;font-size:8.5pt;color:#63798b">Persoonlijke marathonbegeleiding</p></td>' +
+    '<td width="110" valign="middle" align="right" style="width:110pt"><p style="margin:0;font-size:8pt;font-weight:bold;letter-spacing:1pt;color:#63798b">TRAININGSPLAN</p></td>' +
+    '</tr><tr><td colspan="3" height="5" bgcolor="#D5F36B" style="height:4pt;background:#D5F36B;font-size:1pt;line-height:1pt">&nbsp;</td></tr></table>' +
+    '<p class="page-title" style="margin:16pt 0 3pt 0;font-size:8pt;font-weight:bold;letter-spacing:1.2pt;color:#63798b">JOUW TRAININGSPLAN</p>' +
+    '<p style="margin:0;font-size:21pt;line-height:1.15;font-weight:bold;color:#183247">Marathonschema voor ' + esc(athleteName) + '</p>' +
+    '<p style="margin:4pt 0 12pt 0;font-size:9.5pt;color:#63798b">Een persoonlijk schema, ingesteld door je coach.</p>' +
+    '<table width="100%" border="0" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin:0 0 12pt 0"><tr>' +
+    '<td width="33%" valign="top" style="width:33%;padding:7pt 8pt;border:1px solid #dae4ec;background:#f5f8fa"><p style="margin:0;font-size:7.5pt;color:#63798b">MARATHONDATUM</p><p style="margin:2pt 0 0 0;font-size:10pt;font-weight:bold;color:#183247">' + esc(dateLabel(plan.marathonDate, { day: 'numeric', month: 'long', year: 'numeric' })) + '</p></td>' +
+    '<td width="34%" valign="top" style="width:34%;padding:7pt 8pt;border:1px solid #dae4ec;background:#f5f8fa"><p style="margin:0;font-size:7.5pt;color:#63798b">DOELTIJD</p><p style="margin:2pt 0 0 0;font-size:10pt;font-weight:bold;color:#183247">' + esc(formatTime(plan.goalTime)) + '</p></td>' +
+    '<td width="33%" valign="top" style="width:33%;padding:7pt 8pt;border:1px solid #dae4ec;background:#f5f8fa"><p style="margin:0;font-size:7.5pt;color:#63798b">OPBOUW</p><p style="margin:2pt 0 0 0;font-size:10pt;font-weight:bold;color:#183247">' + esc(String(plan.length)) + ' weken</p></td>' +
+    '</tr></table>' +
+    '<p style="margin:0 0 4pt 0;font-size:13pt;font-weight:bold;color:#183247">Trainingsweken</p>' +
+    weeksHtml +
+    '<table width="100%" border="0" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin:17pt 0 0 0;page-break-inside:avoid">' +
+    '<tr><td height="3" bgcolor="#D5F36B" style="height:3pt;background:#D5F36B;font-size:1pt;line-height:1pt">&nbsp;</td></tr>' +
+    '<tr><td style="padding:7pt 0 0 0">' +
+    '<p style="margin:0 0 4pt 0;font-size:8.5pt;color:#456176"><b>Opbouw:</b> Dit schema is gebaseerd op de trainingsopbouw van All4Running en door je coach persoonlijk ingesteld. Dit is geen officieel All4Running-document.</p>' +
+    '<p style="margin:0 0 4pt 0;font-size:8.5pt;color:#456176"><b>Belangrijk:</b> Dit schema is een richtlijn en geen medisch advies. Pas trainingen aan bij klachten of herstelproblemen en bespreek twijfel met je coach.</p>' +
+    '<p style="margin:8pt 0 0 0;font-size:8pt;color:#8396a7">Aangemaakt op ' + esc(generatedDate) + ' · Marathon Coach</p>' +
+    '</td></tr></table>' +
+    '</div></body></html>'
+}
 
 function LinkedActivitySummary({ activity }: { activity: RunActivity }) {
   const details = [
