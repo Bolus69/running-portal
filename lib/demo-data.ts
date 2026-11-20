@@ -38,7 +38,7 @@ export function createDemoData(now = new Date()): DashboardData {
   const nineDaysAgo = addDays(today, -9)
   const activities: RunActivity[] = [
     {
-      id: 'demo-strava-1',
+      id: 'demo-upload-1',
       name: 'Rustige duurloop met blokken',
       startedAt: dateString(fourDaysAgo) + 'T08:12:00',
       activityType: 'Run',
@@ -46,7 +46,7 @@ export function createDemoData(now = new Date()): DashboardData {
       distanceKm: 9.8,
       pace: '5:18',
       averageHeartRate: 143,
-      source: 'strava',
+      source: 'upload',
       plannedWorkoutId: activeWeek.workouts[0]?.id,
       effort: 'as_expected',
       laps: [
@@ -77,7 +77,6 @@ export function createDemoData(now = new Date()): DashboardData {
   }
   return {
     profile: { id: 'demo-athlete', name: 'Demo-atleet', role: 'athlete' },
-    stravaConnected: true,
     plan: {
       length: 16,
       marathonDate,
@@ -100,7 +99,6 @@ export function createDemoData(now = new Date()): DashboardData {
         trainingDays: [2, 4, 0],
         includeOptionalFourth: true,
         optionalTrainingDay: 6,
-        stravaConnected: true,
         currentWeek,
         phase: currentWeekLabel,
         plannedThisWeek: 3,
@@ -120,7 +118,6 @@ export function createDemoData(now = new Date()): DashboardData {
         trainingDays: [2, 4, 0],
         includeOptionalFourth: true,
         optionalTrainingDay: 6,
-        stravaConnected: false,
         currentWeek: Math.max(1, currentWeek - 1),
         phase: 'Opbouw',
         plannedThisWeek: 3,
@@ -141,7 +138,6 @@ export function createDemoData(now = new Date()): DashboardData {
         trainingDays: [2, 4, 0],
         includeOptionalFourth: true,
         optionalTrainingDay: 6,
-        stravaConnected: false,
         currentWeek: Math.min(20, currentWeek + 2),
         phase: 'Basis',
         plannedThisWeek: 3,

@@ -273,10 +273,6 @@ async function loadCoachData(supabase: Awaited<ReturnType<typeof import('@/lib/s
   ])
   const profiles = ((profileResult.data ?? []) as unknown as Row[])
   const nameById = new Map(profiles.map((profile) => [String(profile.id), String(profile.full_name || 'Atleet')]))
-  const { data: athleteStravaRows } = athleteIds.length
-    ? await admin.from('strava_connections').select('athlete_id,is_active').in('athlete_id', athleteIds)
-    : { data: [] }
-  const stravaConnectedAthletes = new Set(((athleteStravaRows ?? []) as unknown as Row[]).filter((row) => Boolean(row.is_active)).map((row) => String(row.athlete_id)))
   const notesByAthlete = new Map<string, { id: string; note: string; createdAt: string }[]>()
   for (const row of (noteResult.data ?? []) as unknown as Row[]) {
     const athleteId = String(row.athlete_id)
@@ -305,7 +301,6 @@ async function loadCoachData(supabase: Awaited<ReturnType<typeof import('@/lib/s
       optionalTrainingDay: plan?.optionalTrainingDay ?? 6,
       recentRaceDistanceKm: plan?.recentRaceDistanceKm,
       recentRaceTimeSeconds: plan?.recentRaceTimeSeconds,
-      stravaConnected: stravaConnectedAthletes.has(athleteId),
       recentWeeklyKm: plan?.recentWeeklyKm,
       recentLongestRunKm: plan?.recentLongestRunKm,
       currentWeek: plan?.currentWeek ?? 1,
@@ -338,13 +333,9 @@ async function loadCoachData(supabase: Awaited<ReturnType<typeof import('@/lib/s
       createdAt: String(row.created_at),
     }
   })
-  const [{ data: stravaConnection }, activities] = await Promise.all([
-    admin.from('strava_connections').select('is_active').eq('athlete_id', userId).maybeSingle(),
-    loadActivities(supabase, userId),
-  ])
+  const activities = await loadActivities(supabase, userId)
   return {
     profile: { id: userId, name: fullName, role: 'coach' },
-    stravaConnected: Boolean(stravaConnection?.is_active),
     plan: null,
     activities,
     wellness: [],
@@ -385,11 +376,8 @@ export async function loadDashboardData(): Promise<DashboardData> {
     status: String(row.state) as 'pending' | 'accepted' | 'modified' | 'rejected',
     createdAt: String(row.created_at),
   }))
-  const admin = createAdminSupabaseClient()
-  const { data: stravaConnection } = await admin.from('strava_connections').select('is_active').eq('athlete_id', user.id).maybeSingle()
   return {
     profile: { id: user.id, name: fullName, role },
-    stravaConnected: Boolean(stravaConnection?.is_active),
     plan,
     activities,
     wellness,

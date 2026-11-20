@@ -49,7 +49,6 @@ export type AthleteSummary = {
   optionalTrainingDay?: number
   recentRaceDistanceKm?: number
   recentRaceTimeSeconds?: number
-  stravaConnected?: boolean
   recentWeeklyKm?: number
   recentLongestRunKm?: number
   reason?: string
@@ -82,7 +81,6 @@ export type WellnessEntry = {
 
 export type DashboardData = {
   profile: { id: string; name: string; role: AppRole }
-  stravaConnected?: boolean
   plan: {
     length: PlanLength
     marathonDate: string
