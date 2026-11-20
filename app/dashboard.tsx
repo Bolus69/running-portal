@@ -776,7 +776,6 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
     setModal('plan')
   }
 
-  const todayWellness = data.wellness.find((item) => item.date === todayDateISO())
   const navItems = role === 'athlete'
     ? [{ id: 'week' as const, icon: 'appLogo', label: 'Deze week' }, { id: 'plan' as const, icon: 'plan', label: 'Mijn schema' }, { id: 'history' as const, icon: 'history', label: 'Geschiedenis' }, { id: 'wellness' as const, icon: 'heart', label: 'Herstel & welzijn' }, { id: 'profile' as const, icon: 'user', label: 'Mijn profiel' }]
     : [{ id: 'coach' as const, icon: 'coach', label: 'Overzicht' }, { id: 'athletes' as const, icon: 'people', label: 'Atleten' }, { id: 'suggestions' as const, icon: 'spark', label: 'Voorstellen' }, { id: 'profile' as const, icon: 'user', label: 'Atleetprofiel' }]
@@ -837,7 +836,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
 
           {view === 'plan' && <PlanView role={role} athleteName={data.profile.name} plan={plan} activities={data.activities} onWorkout={setExpandedWorkout} expandedWorkout={expandedWorkout} onEnterWorkout={openWorkoutFeedback} />}
           {view === 'history' && <HistoryView activities={data.activities} workouts={plan?.weeks.flatMap((week) => week.workouts) ?? []} onEditWorkout={openWorkoutFeedbackById} onAdd={() => setModal('activity')} />}
-          {view === 'wellness' && <WellnessView wellness={data.wellness} todayWellness={todayWellness} draft={wellnessDraft} setDraft={setWellnessDraft} onSubmit={saveWellness} />}
+          {view === 'wellness' && <WellnessView wellness={data.wellness} draft={wellnessDraft} setDraft={setWellnessDraft} onSubmit={saveWellness} />}
           {view === 'profile' && role === 'coach' && data.athletes.length === 0 && <div className="empty-state"><div className="empty-plan-mark"><Icon name="people" size={24} /></div><h3>Nog geen atleten</h3><p>Nodig eerst een atleet uit. Daarna kun je hier diens marathoninstellingen bekijken en beheren.</p><button type="button" className="button button-primary button-small" onClick={() => setModal('invite')}><Icon name="plus" size={15} /> Atleet uitnodigen</button></div>}
           {view === 'profile' && role === 'athlete' && !plan && <AthletePlanPending />}
           {view === 'profile' && ((role === 'athlete' && Boolean(plan)) || role === 'coach') && <ProfileView data={data} role={role} athletes={data.athletes} selectedAthlete={role === 'coach' ? profileAthlete : null} onSelectAthlete={selectProfileAthlete} draft={profileDraft} setDraft={setProfileDraft} paces={paces} onSubmit={role === 'coach' ? saveCoachProfile : savePlan} />}
@@ -860,7 +859,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
         <div className="field full"><span>Hoe ging de training? <small>optioneel</small></span><div className="quick-effort-options" role="group" aria-label="Hoe voelde de training?">{([{ value: 'easier', label: 'Makkelijker' }, { value: 'as_expected', label: 'Zoals verwacht' }, { value: 'harder', label: 'Zwaarder' }, { value: 'not_good', label: 'Niet goed' }] as const).map((option) => <button key={option.value} type="button" aria-pressed={feedbackDraft.effort === option.value} className={feedbackDraft.effort === option.value ? 'selected' : ''} onClick={() => setFeedbackDraft((current) => ({ ...current, effort: current.effort === option.value ? '' : option.value }))}>{option.label}</button>)}</div></div>
         <label className="field full"><span>Korte toelichting <small>optioneel · maximaal 200 tekens</small></span><textarea rows={2} maxLength={200} value={feedbackDraft.note} onChange={(event) => setFeedbackDraft({ ...feedbackDraft, note: event.target.value })} placeholder="Bijvoorbeeld: voelde soepel, maar lichte knieklachten." /><small className="feedback-character-count">{feedbackDraft.note.length}/200</small></label>
         {feedbackLinkedActivity && <div className="invite-note full"><Icon name="check" size={18} /><span>Er is al een activiteit aan deze training gekoppeld ({feedbackLinkedActivity.source === 'strava' ? 'Strava' : feedbackLinkedActivity.source === 'upload' ? 'FIT-bestand' : 'handmatige invoer'}). De gegevens staan bij de training.</span></div>}
-        {!demoMode && !feedbackLinkedActivity && <div className="field full"><span>Trainingbestand <small>optioneel · FIT-bestand tot 4 MB</small></span><input key={activityFile ? activityFile.name + activityFile.size : 'empty'} type="file" accept=".fit,application/octet-stream" disabled={savingWorkoutFeedback} onChange={(event) => { const file = event.currentTarget.files?.[0] ?? null; setActivityUploadError(''); if (file && !file.name.toLowerCase().endsWith('.fit')) { setActivityFile(null); setActivityUploadError('Kies een FIT-bestand (.fit).'); return } if (file && file.size > 4 * 1024 * 1024) { setActivityFile(null); setActivityUploadError('Het bestand moet kleiner zijn dan 4 MB.'); return } setActivityFile(file) }} /><small className="fit-upload-guide">Download het bestand via de <a href="https://support.strava.com/nl/articles/15401919-hoe-kan-ik-mijn-strava-gegevens-exporteren" target="_blank" rel="noreferrer">Strava-website</a> (niet de app): open de activiteit, kies bij ⋯ voor ‘Origineel exporteren’ en upload hier het bestand dat eindigt op .fit. Strava downloadt het oorspronkelijke bestandsformaat; dat is alleen .fit als de opname oorspronkelijk in FIT-formaat is opgeslagen.</small><small className="activity-upload-note">We bewaren afstand, duur, hartslag en eventuele blokken. Het originele bestand en de gps-route worden niet opgeslagen.</small>{activityFile && <div className="activity-upload-selected"><span>Geselecteerd: {activityFile.name}</span><button type="button" className="text-button subtle" onClick={() => { setActivityFile(null); setActivityUploadError('') }} disabled={savingWorkoutFeedback}>Verwijderen</button></div>}</div>}
+        {!demoMode && !feedbackLinkedActivity && <div className="field full"><span>Trainingbestand <small>optioneel · FIT-bestand tot 4 MB</small></span><input key={activityFile ? activityFile.name + activityFile.size : 'empty'} type="file" accept=".fit,application/octet-stream" disabled={savingWorkoutFeedback} onChange={(event) => { const file = event.currentTarget.files?.[0] ?? null; setActivityUploadError(''); if (file && !file.name.toLowerCase().endsWith('.fit')) { setActivityFile(null); setActivityUploadError('Kies een FIT-bestand (.fit).'); return } if (file && file.size > 4 * 1024 * 1024) { setActivityFile(null); setActivityUploadError('Het bestand moet kleiner zijn dan 4 MB.'); return } setActivityFile(file) }} /><div className="fit-upload-guide"><strong>Zo download je het FIT-bestand via de <a href="https://support.strava.com/nl/articles/15401919-hoe-kan-ik-mijn-strava-gegevens-exporteren" target="_blank" rel="noreferrer">Strava-website</a></strong><ol><li>Open Strava in een internetbrowser en ga naar de gewenste activiteit.</li><li>Kies bij <b>⋯</b> voor <b>Origineel exporteren</b>.</li><li>Kies hier het gedownloade bestand dat eindigt op <b>.fit</b>.</li></ol><p>Strava exporteert het oorspronkelijke bestand. Is dat geen FIT-bestand? Voeg je training dan handmatig toe.</p></div><small className="activity-upload-note">We bewaren afstand, duur, hartslag en eventuele blokken. Het originele FIT-bestand en de gps-route worden niet opgeslagen.</small>{activityFile && <div className="activity-upload-selected"><span>Geselecteerd: {activityFile.name}</span><button type="button" className="text-button subtle" onClick={() => { setActivityFile(null); setActivityUploadError('') }} disabled={savingWorkoutFeedback}>Verwijderen</button></div>}</div>}
         {activityUploadError && <div className="activity-upload-error full" role="alert">{activityUploadError}</div>}
         <div className="modal-actions full"><button type="button" className="button button-outline" onClick={() => setModal(null)} disabled={savingWorkoutFeedback}>Annuleren</button><button className="button button-primary" disabled={savingWorkoutFeedback}>{savingWorkoutFeedback ? 'Opslaan…' : feedbackWorkout.status === 'completed' ? activityFile ? 'Feedback en bestand opslaan' : 'Feedback opslaan' : activityFile ? 'Afronden en bestand uploaden' : 'Training afronden'}</button></div>
       </form></Modal>}
@@ -1229,11 +1228,31 @@ function ActivityLapDetails({ laps }: { laps: NonNullable<RunActivity['laps']> }
   return <details className="lap-details linked-activity-laps"><summary>Bekijk {laps.length} rondes of blokken</summary><div className="lap-table linked-lap-table"><div className="linked-lap-heading"><span>Ronde/blok</span><span>Duur</span><span>Afstand</span><span>Tempo</span><span>Hartslag</span></div>{laps.map((lap) => <div key={lap.id}><span>{lap.label}</span><span>{lap.durationMinutes ? formatLapDuration(lap.durationMinutes) : '—'}</span><span>{lap.distanceKm ? lap.distanceKm.toFixed(2).replace('.', ',') + ' km' : '—'}</span><span>{lap.pace ? lap.pace + ' /km' : '—'}</span><span>{lap.averageHeartRate ? Math.round(lap.averageHeartRate) + ' bpm' : '—'}</span></div>)}</div></details>
 }
 
+type HistoryItem = { id: string; date: string; activity?: RunActivity; workout?: PlanWeek['workouts'][number] }
+
+function buildHistoryItems(activities: RunActivity[], workouts: PlanWeek['workouts']): HistoryItem[] {
+  const cutoffDate = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10)
+  const activityItems: HistoryItem[] = activities.map((activity) => ({
+    id: 'activity:' + activity.id,
+    date: activity.startedAt,
+    activity,
+    workout: activity.plannedWorkoutId ? workouts.find((workout) => workout.id === activity.plannedWorkoutId) : undefined,
+  }))
+  const linkedWorkoutIds = new Set(activities.map((activity) => activity.plannedWorkoutId).filter((id): id is string => Boolean(id)))
+  const feedbackItems: HistoryItem[] = workouts
+    .filter((workout) => workout.status === 'completed' && !linkedWorkoutIds.has(workout.id))
+    .map((workout) => ({ id: 'workout:' + workout.id, date: workout.feedback?.completedAt ?? workout.date, workout }))
+    .filter((item) => item.date.slice(0, 10) >= cutoffDate)
+  return [...activityItems, ...feedbackItems].sort((a, b) => b.date.localeCompare(a.date))
+}
+
 function HistoryView({ activities, workouts, onEditWorkout, onAdd }: { activities: RunActivity[]; workouts: PlanWeek['workouts']; onEditWorkout: (workoutId: string) => void; onAdd: () => void }) {
-  const items = [...activities].sort((a, b) => b.startedAt.localeCompare(a.startedAt))
-  return <section className="history-page"><div className="history-toolbar"><div className="filter-chip active">Laatste 30 dagen</div><button className="button button-outline button-small" onClick={onAdd}><Icon name="plus" size={15} /> Handmatig toevoegen</button></div>{items.length ? <div className="history-list">{items.map((activity) => {
-    const linkedWorkout = activity.plannedWorkoutId ? workouts.find((workout) => workout.id === activity.plannedWorkoutId) : undefined
-    return <article className="history-card" key={activity.id}><div className="history-date"><strong>{dateLabel(activity.startedAt, { day: 'numeric' })}</strong><span>{dateLabel(activity.startedAt, { month: 'short' })}</span></div><div className={'history-activity-icon' + (linkedWorkout ? ' type-' + linkedWorkout.type : '')}><Icon name={linkedWorkout ? workoutIconName(linkedWorkout.type) : 'runner'} size={18} /></div><div className="history-main"><div className="history-title-row"><h3>{activity.name}</h3><span className={'source-pill source-' + activity.source}>{activity.source === 'strava' ? <><Icon name="link" size={13} /> Strava</> : activitySourceLabel(activity.source)}</span></div><div className="history-meta"><span>{activity.distanceKm ? activity.distanceKm.toFixed(1).replace('.', ',') + ' km' : 'Afstand niet ingevuld'}</span><span>{activity.durationMinutes} min</span>{activity.pace && <span>{activity.pace} /km</span>}{activity.averageHeartRate && <span>{activity.averageHeartRate} bpm gem.</span>}</div>{activity.effort && <p className="history-feedback"><span>Gevoel</span>{effortLabel(activity.effort)}</p>}{activity.note && <p className="history-note">{activity.note}</p>}{activity.laps && activity.laps.length > 0 && <ActivityLapDetails laps={activity.laps} />}{linkedWorkout && <div className="history-entry-actions"><button type="button" className="button button-outline button-small" onClick={() => onEditWorkout(linkedWorkout.id)}>{linkedWorkout.status === 'completed' ? linkedWorkout.feedback ? 'Feedback aanpassen' : 'Feedback toevoegen' : linkedWorkout.status === 'skipped' ? 'Training alsnog invullen' : 'Training afronden'}</button></div>}</div><span className={'history-link-status ' + (activity.plannedWorkoutId ? 'linked' : 'unlinked')}>{activity.plannedWorkoutId ? 'Gekoppeld' : 'Losse activiteit'}</span></article>
+  const items = buildHistoryItems(activities, workouts)
+  return <section className="history-page"><div className="history-toolbar"><div className="filter-chip active">Laatste 30 dagen</div><button className="button button-outline button-small" onClick={onAdd}><Icon name="plus" size={15} /> Handmatig toevoegen</button></div>{items.length ? <div className="history-list">{items.map((item) => {
+    const { activity, workout } = item
+    const effort = activity?.effort ?? workout?.feedback?.effort
+    const note = activity?.note ?? workout?.feedback?.note
+    return <article className="history-card" key={item.id}><div className="history-date"><strong>{dateLabel(item.date, { day: 'numeric' })}</strong><span>{dateLabel(item.date, { month: 'short' })}</span></div><div className={'history-activity-icon' + (workout ? ' type-' + workout.type : '')}><Icon name={workout ? workoutIconName(workout.type) : 'runner'} size={18} /></div><div className="history-main"><div className="history-title-row"><h3>{activity?.name ?? workout?.title ?? 'Hardlooptraining'}</h3><span className={'source-pill ' + (activity ? 'source-' + activity.source : 'source-completed')}>{activity ? activitySourceLabel(activity.source) : 'Schema'}</span></div>{activity ? <div className="history-meta"><span>{activity.distanceKm ? activity.distanceKm.toFixed(1).replace('.', ',') + ' km' : 'Afstand niet ingevuld'}</span><span>{activity.durationMinutes} min</span>{activity.pace && <span>{activity.pace} /km</span>}{activity.averageHeartRate && <span>{activity.averageHeartRate} bpm gem.</span>}</div> : <p className="history-note completed-workout-note">Als uitgevoerd gemarkeerd in je schema.</p>}{effort && <p className="history-feedback"><span>Gevoel</span>{effortLabel(effort)}</p>}{note && <p className="history-note">{note}</p>}{activity?.laps && activity.laps.length > 0 && <ActivityLapDetails laps={activity.laps} />}{workout && <div className="history-entry-actions"><button type="button" className="button button-outline button-small" onClick={() => onEditWorkout(workout.id)}>{workout.feedback ? 'Feedback aanpassen' : 'Feedback toevoegen'}</button></div>}</div><span className={'history-link-status ' + (activity?.plannedWorkoutId ? 'linked' : workout ? 'linked' : 'unlinked')}>{activity?.plannedWorkoutId ? 'Gekoppeld' : workout ? 'Uitgevoerd' : 'Losse activiteit'}</span></article>
   })}</div> : <div className="empty-state"><div className="empty-plan-mark"><Icon name="history" size={24} /></div><h3>Nog geen trainingen</h3><p>Voeg na je training kort de belangrijkste gegevens toe.</p><button className="button button-primary button-small" onClick={onAdd}><Icon name="plus" size={15} /> Handmatig toevoegen</button></div>}</section>
 }
 
@@ -1296,8 +1315,9 @@ function TrainingDaysControl({ draft, setDraft, disabled = false }: { draft: Pro
   )
 }
 
-function WellnessView({ wellness, todayWellness, draft, setDraft, onSubmit }: { wellness: WellnessEntry[]; todayWellness?: WellnessEntry; draft: WellnessDraft; setDraft: React.Dispatch<React.SetStateAction<WellnessDraft>>; onSubmit: (event: React.FormEvent<HTMLFormElement>) => void }) {
+function WellnessView({ wellness, draft, setDraft, onSubmit }: { wellness: WellnessEntry[]; draft: WellnessDraft; setDraft: React.Dispatch<React.SetStateAction<WellnessDraft>>; onSubmit: (event: React.FormEvent<HTMLFormElement>) => void }) {
   const entryDate = todayDateISO()
+  const diaryEntries = [...wellness].sort((a, b) => b.date.localeCompare(a.date))
   return (
     <div className="wellness-layout">
       <section className="wellness-form-card">
@@ -1316,25 +1336,17 @@ function WellnessView({ wellness, todayWellness, draft, setDraft, onSubmit }: { 
         </form>
       </section>
       <aside className="wellness-side">
-        <div className="privacy-card">
-          <span className="aside-icon light"><Icon name="shield" /></span><h3>Jij bepaalt wat je deelt</h3>
-          <p>Herstelgegevens zijn ondersteunende context voor het coachgesprek. Ze zijn geen medische beoordeling of diagnose.</p>
-          <div className="privacy-points"><span><Icon name="check" size={15} /> Geen dagelijkse verplichting</span><span><Icon name="check" size={15} /> Geen herinneringen bij lege velden</span><span><Icon name="check" size={15} /> Zelf kiezen of de coach meekijkt</span></div>
-        </div>
-        <div className="wellness-history">
-          <div className="small-label">LAATSTE INVOER</div>
-          {todayWellness ? <div className="wellness-entry">
-            <strong>{dateLabel(todayWellness.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</strong>
-            <span>{todayWellness.sleepHours ? todayWellness.sleepHours + ' uur slaap' : 'Slaap niet ingevuld'}</span>
-            {todayWellness.restingHeartRate ? <span>{todayWellness.restingHeartRate} bpm rusthartslag</span> : null}
-            {todayWellness.recoveryScore ? <div className="wellness-entry-score"><RecoveryMood value={todayWellness.recoveryScore} /></div> : null}
-          </div> : <p className="muted">Je hebt vandaag nog niets ingevuld.</p>}
-          {wellness.filter((entry) => entry.date !== todayWellness?.date).slice(0, 4).map((entry) => (
-            <div className="wellness-entry compact" key={entry.id}>
-              <strong>{dateLabel(entry.date, { day: 'numeric', month: 'short', year: 'numeric' })}</strong>
-              <span>{entry.recoveryScore ? <RecoveryMood value={entry.recoveryScore} size={15} /> : entry.sleepHours ? entry.sleepHours + ' uur slaap' : 'Invoer opgeslagen'}</span>
+        <div className="wellness-history wellness-diary">
+          <div className="wellness-diary-heading"><div><p className="eyebrow">HERSTEL & WELZIJN</p><h2>Jouw dagboek</h2></div><span>{diaryEntries.length} {diaryEntries.length === 1 ? 'dag' : 'dagen'}</span></div>
+          {diaryEntries.length ? <div className="wellness-diary-list">{diaryEntries.map((entry) => <article className="wellness-diary-entry" key={entry.id}>
+            <div className="wellness-diary-entry-heading"><strong>{dateLabel(entry.date, { weekday: 'long', day: 'numeric', month: 'long' })}</strong><span className={entry.visibleToCoach ? 'shared' : ''}>{entry.visibleToCoach ? 'Gedeeld met coach' : 'Privé'}</span></div>
+            <div className="wellness-diary-metrics">
+              {entry.sleepHours !== undefined && <span><small>Slaap</small><strong>{String(entry.sleepHours).replace('.', ',')} uur</strong></span>}
+              {entry.restingHeartRate !== undefined && <span><small>Rusthartslag</small><strong>{entry.restingHeartRate} bpm</strong></span>}
+              {entry.recoveryScore !== undefined && <span><small>Herstelgevoel</small><RecoveryMood value={entry.recoveryScore} size={16} /></span>}
             </div>
-          ))}
+            {entry.note && <p className="wellness-diary-note">{entry.note}</p>}
+          </article>)}</div> : <p className="wellness-diary-empty">Je opgeslagen herstelgegevens verschijnen hier per dag.</p>}
         </div>
       </aside>
     </div>
@@ -1413,6 +1425,7 @@ function AthleteDetail({ athlete, data, onBack, onSetupPlan, onAddNote, onRemove
   const [noteDraft, setNoteDraft] = useState('')
   const recent = (athlete.activities ?? data.activities).slice(0, 30)
   const planWeeks = athlete.planWeeks ?? []
+  const historyItems = buildHistoryItems(recent, planWeeks.flatMap((week) => week.workouts))
 
   async function submitCoachNote(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -1436,7 +1449,7 @@ function AthleteDetail({ athlete, data, onBack, onSetupPlan, onAddNote, onRemove
     </div>
     {athlete.reason && <div className="attention-note"><Icon name="spark" size={18} /><span><strong>Coachcontext</strong>{athlete.reason}</span></div>}
     {(athlete.recentWeeklyKm || athlete.recentLongestRunKm) && <div className="attention-note training-baseline"><Icon name="runner" size={18} /><span><strong>Recente trainingsbasis</strong>{athlete.recentWeeklyKm ? athlete.recentWeeklyKm + ' km per week' : ''}{athlete.recentWeeklyKm && athlete.recentLongestRunKm ? ' · ' : ''}{athlete.recentLongestRunKm ? 'langste duurloop ' + athlete.recentLongestRunKm + ' km' : ''}. Gebruik dit als context bij de beoordeling van de startweken.</span></div>}
-    {athlete.wellness && athlete.wellness.length > 0 && <div className="shared-wellness"><strong>Gedeelde herstelgegevens</strong>{athlete.wellness.slice(0, 3).map((item) => <span key={item.id}>{dateLabel(item.date, { day: 'numeric', month: 'short' })}{item.sleepHours ? ' · ' + item.sleepHours + ' uur slaap' : ''}{item.restingHeartRate ? ' · ' + item.restingHeartRate + ' bpm rusthartslag' : ''}{item.recoveryScore ? <span className="shared-wellness-recovery"> · <Icon name={'mood' + item.recoveryScore} size={14} /> {recoveryLabel(item.recoveryScore)}</span> : null}</span>)}</div>}
+    {athlete.wellness && athlete.wellness.length > 0 && <section className="shared-wellness wellness-diary coach-wellness-diary"><div className="wellness-diary-heading"><div><p className="eyebrow">ATLEET HEEFT GEDEELD</p><h2>Herstel & welzijn</h2></div><span>{athlete.wellness.length} {athlete.wellness.length === 1 ? 'dag' : 'dagen'}</span></div><div className="wellness-diary-list">{athlete.wellness.map((item) => <article className="wellness-diary-entry" key={item.id}><div className="wellness-diary-entry-heading"><strong>{dateLabel(item.date, { weekday: 'long', day: 'numeric', month: 'long' })}</strong><span className="shared">Gedeeld met coach</span></div><div className="wellness-diary-metrics">{item.sleepHours !== undefined && <span><small>Slaap</small><strong>{String(item.sleepHours).replace('.', ',')} uur</strong></span>}{item.restingHeartRate !== undefined && <span><small>Rusthartslag</small><strong>{item.restingHeartRate} bpm</strong></span>}{item.recoveryScore !== undefined && <span><small>Herstelgevoel</small><RecoveryMood value={item.recoveryScore} size={16} /></span>}</div>{item.note && <p className="wellness-diary-note">{item.note}</p>}</article>)}</div></section>}
     {planWeeks.length > 0 && <section className="coach-plan-timeline">
       <div className="section-heading"><div><p className="eyebrow">PLANNING</p><h2>Volledig trainingsplan</h2></div></div>
       <div className="plan-week-list">{planWeeks.map((week) => {
@@ -1454,7 +1467,7 @@ function AthleteDetail({ athlete, data, onBack, onSetupPlan, onAddNote, onRemove
       {(athlete.coachNotes ?? []).length === 0 ? <p className="muted">Nog geen notities toegevoegd.</p> : (athlete.coachNotes ?? []).map((item) => <div className="wellness-entry" key={item.id}><strong>{dateLabel(item.createdAt, { day: 'numeric', month: 'long', year: 'numeric' })}</strong><span>{item.note}</span></div>)}
     </section>
     <div className="section-heading"><div><p className="eyebrow">LAATSTE 30 DAGEN</p><h2>Trainingsgeschiedenis</h2></div></div>
-    <div className="history-list compact-history">{recent.map((activity) => { const linkedWorkout = activity.plannedWorkoutId ? planWeeks.flatMap((week) => week.workouts).find((workout) => workout.id === activity.plannedWorkoutId) : undefined; return <div className="history-card" key={activity.id}><div className={'history-activity-icon' + (linkedWorkout ? ' type-' + linkedWorkout.type : '')}><Icon name={linkedWorkout ? workoutIconName(linkedWorkout.type) : 'runner'} size={18} /></div><div className="history-main"><div className="history-title-row"><h3>{activity.name}</h3><span className={'source-pill source-' + activity.source}>{activitySourceLabel(activity.source)}</span></div><div className="history-meta"><span>{dateLabel(activity.startedAt)}</span><span>{activity.distanceKm ? activity.distanceKm.toFixed(1).replace('.', ',') + ' km' : '—'}</span><span>{activity.durationMinutes} min</span>{activity.pace && <span>{activity.pace} /km</span>}</div>{activity.effort && <p className="history-feedback"><span>Gevoel</span>{effortLabel(activity.effort)}</p>}{activity.note && <p className="history-note">{activity.note}</p>}</div></div>})}</div>
+    <div className="history-list compact-history">{historyItems.map((item) => { const activity = item.activity; const workout = item.workout; const effort = activity?.effort ?? workout?.feedback?.effort; const note = activity?.note ?? workout?.feedback?.note; return <div className="history-card" key={item.id}><div className={'history-activity-icon' + (workout ? ' type-' + workout.type : '')}><Icon name={workout ? workoutIconName(workout.type) : 'runner'} size={18} /></div><div className="history-main"><div className="history-title-row"><h3>{activity?.name ?? workout?.title ?? 'Hardlooptraining'}</h3><span className={'source-pill ' + (activity ? 'source-' + activity.source : 'source-completed')}>{activity ? activitySourceLabel(activity.source) : 'Schema'}</span></div><div className="history-meta"><span>{dateLabel(item.date)}</span>{activity ? <><span>{activity.distanceKm ? activity.distanceKm.toFixed(1).replace('.', ',') + ' km' : '—'}</span><span>{activity.durationMinutes} min</span>{activity.pace && <span>{activity.pace} /km</span>}</> : <span>Uitgevoerd volgens schema</span>}</div>{effort && <p className="history-feedback"><span>Gevoel</span>{effortLabel(effort)}</p>}{note && <p className="history-note">{note}</p>}</div></div>})}{historyItems.length === 0 && <p className="muted">Nog geen trainingen uitgevoerd in de afgelopen 30 dagen.</p>}</div>
     <p className="plan-disclaimer"><Icon name="shield" size={16} /> Herstelgegevens zijn alleen zichtbaar als de atleet deze met jou deelt.</p>
     {canRemove && <section className="delete-athlete-zone" aria-labelledby="delete-athlete-heading"><div><p className="eyebrow">GEVOELIGE ACTIE</p><h2 id="delete-athlete-heading">Atleetaccount verwijderen</h2><p>Verwijdert het Marathon Coach-account en alle gekoppelde gegevens definitief.</p></div><button type="button" className="button button-danger button-small" onClick={onRemove}>Atleet verwijderen</button></section>}
   </section>
