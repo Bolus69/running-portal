@@ -3,7 +3,8 @@ import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 type StravaSummaryActivity = {
-  id: number
+  id?: number | string
+  id_str?: string
   name: string
   type?: string
   sport_type?: string
@@ -17,6 +18,19 @@ type StravaSummaryActivity = {
   average_cadence?: number
   total_elevation_gain?: number
   workout_type?: number
+}
+
+type StravaIdFields = { id?: number | string; id_str?: string }
+
+export function getStravaId(value: StravaIdFields): string | null {
+  const rawId = value.id_str !== undefined
+    ? (typeof value.id_str === 'string' ? value.id_str : null)
+    : typeof value.id === 'string'
+      ? value.id
+      : typeof value.id === 'number' && Number.isSafeInteger(value.id)
+        ? String(value.id)
+        : null
+  return rawId && /^[1-9]\d{0,19}$/.test(rawId) ? rawId : null
 }
 
 export type StravaActivityCandidate = {
@@ -317,11 +331,13 @@ function isRun(activity: StravaSummaryActivity): boolean {
 }
 
 function activityRow(athleteId: string, activity: StravaSummaryActivity) {
+  const externalActivityId = getStravaId(activity)
+  if (!externalActivityId) throw new Error('Strava activity ID is invalid.')
   const startedAt = activity.start_date ? new Date(activity.start_date).toISOString() : new Date().toISOString()
   return {
     athlete_id: athleteId,
     source: 'strava' as const,
-    external_activity_id: String(activity.id),
+    external_activity_id: externalActivityId,
     name: String(activity.name || 'Hardlooptraining').slice(0, 120),
     activity_type: String(activity.sport_type || activity.type || 'Run').slice(0, 50),
     started_at: startedAt,
@@ -399,14 +415,14 @@ async function activitiesAroundWorkout(admin: AdminClient, athleteId: string, wo
     token = await refreshAccessToken(admin, athleteId, connection, true)
     activities = await stravaGet<StravaSummaryActivity[]>(path, token)
   }
-  return { token, activities: (Array.isArray(activities) ? activities : []).filter((activity) => isRun(activity) && isDateAroundWorkout(activity, workoutDate)) }
+  return { token, activities: (Array.isArray(activities) ? activities : []).filter((activity) => getStravaId(activity) !== null && isRun(activity) && isDateAroundWorkout(activity, workoutDate)) }
 }
 
 export async function getStravaActivityCandidates(admin: AdminClient, athleteId: string, plannedWorkoutId: string, workoutDate: string): Promise<StravaActivityCandidate[]> {
   const { activities } = await activitiesAroundWorkout(admin, athleteId, workoutDate)
   if (!activities.length) return []
 
-  const externalIds = activities.map((activity) => String(activity.id))
+  const externalIds = activities.map((activity) => getStravaId(activity)).filter((id): id is string => id !== null)
   const { data: savedActivities, error: activityError } = await admin.from('activities')
     .select('id,external_activity_id')
     .eq('athlete_id', athleteId)
@@ -427,12 +443,14 @@ export async function getStravaActivityCandidates(admin: AdminClient, athleteId:
     linkMap.set(String(link.activity_id), [...(linkMap.get(String(link.activity_id)) ?? []), { workoutId: String(link.planned_workout_id), method: String(link.match_method) }])
   }
 
-  return activities.map((activity) => {
-    const activityLinks = linkMap.get(activityIdByExternal.get(String(activity.id)) ?? '') ?? []
+  return activities.flatMap((activity) => {
+    const externalActivityId = getStravaId(activity)
+    if (!externalActivityId) return []
+    const activityLinks = linkMap.get(activityIdByExternal.get(externalActivityId) ?? '') ?? []
     const linkedWorkoutIds = activityLinks.map((link) => link.workoutId)
     const startedAt = activity.start_date_local ?? activity.start_date ?? new Date().toISOString()
     return {
-      id: String(activity.id),
+      id: externalActivityId,
       name: String(activity.name || 'Hardlooptraining').slice(0, 120),
       startedAt,
       distanceKm: typeof activity.distance === 'number' ? Math.round(activity.distance / 10) / 100 : undefined,
@@ -494,9 +512,10 @@ async function linkActivityToWorkout(admin: AdminClient, athleteId: string, acti
 }
 
 async function saveActivity(admin: AdminClient, athleteId: string, activity: StravaSummaryActivity, accessToken: string, allowLapImport: boolean, plannedWorkoutId?: string, replaceExistingActivity = false) {
-  if (!activity.id || !isRun(activity)) return null
+  const externalActivityId = getStravaId(activity)
+  if (!externalActivityId || !isRun(activity)) return null
   const { data: existingActivity, error: existingError } = await admin.from('activities').select('id,athlete_id')
-    .eq('source', 'strava').eq('external_activity_id', String(activity.id)).maybeSingle()
+    .eq('source', 'strava').eq('external_activity_id', externalActivityId).maybeSingle()
   if (existingError) throw new Error('The existing Strava activity could not be checked.')
   if (existingActivity && String(existingActivity.athlete_id) !== athleteId) throw new Error('This Strava activity belongs to another account.')
   const { data, error } = await admin.from('activities').upsert(activityRow(athleteId, activity), { onConflict: 'source,external_activity_id' }).select('id').single()
@@ -505,7 +524,7 @@ async function saveActivity(admin: AdminClient, athleteId: string, activity: Str
   if (allowLapImport) {
     const { data: existingLaps } = await admin.from('activity_laps').select('id').eq('activity_id', activityId).limit(1)
     if (!existingLaps?.length) {
-      const laps = await stravaGet<StravaLap[]>('/activities/' + activity.id + '/laps', accessToken, true)
+      const laps = await stravaGet<StravaLap[]>('/activities/' + encodeURIComponent(externalActivityId) + '/laps', accessToken, true)
       if (Array.isArray(laps) && laps.length > 0) await storeLaps(admin, activityId, laps)
     }
   }
@@ -517,7 +536,7 @@ async function saveActivity(admin: AdminClient, athleteId: string, activity: Str
 export async function attachStravaActivityToWorkout(admin: AdminClient, athleteId: string, plannedWorkoutId: string, workoutDate: string, externalActivityId: string, replaceExistingActivity = false): Promise<void> {
   if (!/^\d{1,20}$/.test(externalActivityId)) throw new Error('De gekozen Strava-activiteit is ongeldig.')
   const { token, activities } = await activitiesAroundWorkout(admin, athleteId, workoutDate)
-  const candidate = activities.find((activity) => String(activity.id) === externalActivityId)
+  const candidate = activities.find((activity) => getStravaId(activity) === externalActivityId)
   if (!candidate || !isDateAroundWorkout(candidate, workoutDate)) throw new Error('De gekozen activiteit is niet meer beschikbaar rond de datum van deze training.')
   const detail = await stravaGet<StravaSummaryActivity>('/activities/' + encodeURIComponent(externalActivityId), token)
   if (!detail || !isRun(detail) || !isDateAroundWorkout(detail, workoutDate)) throw new Error('De gekozen Strava-activiteit past niet bij deze training.')
@@ -551,8 +570,8 @@ export async function syncStravaActivities(admin: AdminClient, athleteId: string
 export type StravaWebhookPayload = {
   object_type: 'activity' | 'athlete'
   aspect_type: 'create' | 'update' | 'delete'
-  object_id: number
-  owner_id: number
+  object_id: string
+  owner_id: string
   event_time?: number
   subscription_id?: number
   updates?: Record<string, string | boolean>
@@ -568,7 +587,7 @@ export async function processStravaWebhook(admin: AdminClient, payload: StravaWe
     return
   }
   if (!connectionData.is_active || payload.object_type !== 'activity') return
-  const externalId = String(payload.object_id)
+  const externalId = payload.object_id
   if (payload.aspect_type === 'update' && (payload.updates?.private === true || payload.updates?.private === 'true')) {
     const { error } = await admin.from('activities').delete().eq('athlete_id', athleteId).eq('source', 'strava').eq('external_activity_id', externalId)
     if (error) throw new Error('Private Strava activity could not be removed')

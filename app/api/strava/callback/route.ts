@@ -3,9 +3,9 @@ import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { encryptStravaToken, ensureStravaWebhookSubscription, stravaOAuthConfigured, syncStravaActivities } from '@/lib/strava'
+import { encryptStravaToken, ensureStravaWebhookSubscription, getStravaId, stravaOAuthConfigured, syncStravaActivities } from '@/lib/strava'
 
-type TokenResponse = { access_token: string; refresh_token: string; expires_at: number; athlete?: { id?: number }; scope?: string }
+type TokenResponse = { access_token: string; refresh_token: string; expires_at: number; athlete?: { id?: number; id_str?: string }; scope?: string }
 
 function safeEqual(left: string, right: string): boolean {
   const a = Buffer.from(left)
@@ -43,8 +43,8 @@ export async function GET(request: Request) {
     })
     if (!tokenResponse.ok) throw new Error('token exchange')
     const tokens = await tokenResponse.json() as TokenResponse
-    const athleteId = Number(tokens.athlete?.id)
-    if (!tokens.access_token || !tokens.refresh_token || !Number.isFinite(athleteId) || athleteId <= 0) throw new Error('token response')
+    const athleteId = tokens.athlete ? getStravaId(tokens.athlete) : null
+    if (!tokens.access_token || !tokens.refresh_token || !athleteId) throw new Error('token response')
     const admin = createAdminSupabaseClient()
     const { data: existingConnection, error: lookupError } = await admin.from('strava_connections')
       .select('athlete_id')

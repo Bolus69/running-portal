@@ -1,7 +1,7 @@
 import { after } from 'next/server'
 import { timingSafeEqual } from 'node:crypto'
 import { createAdminSupabaseClient } from '@/lib/supabase/admin'
-import { processStravaWebhook, type StravaWebhookPayload } from '@/lib/strava'
+import { getStravaId, processStravaWebhook, type StravaWebhookPayload } from '@/lib/strava'
 
 export const maxDuration = 30
 
@@ -47,6 +47,96 @@ async function readBodyWithinLimit(request: Request, maxBytes: number): Promise<
   }
 }
 
+function skipWhitespace(text: string, start: number): number {
+  let index = start
+  while (index < text.length && /\s/.test(text[index])) index += 1
+  return index
+}
+
+function readStringEnd(text: string, start: number): number | null {
+  if (text[start] !== '"') return null
+  let escaped = false
+  for (let index = start + 1; index < text.length; index += 1) {
+    const character = text[index]
+    if (escaped) escaped = false
+    else if (character === '\\') escaped = true
+    else if (character === '"') return index + 1
+  }
+  return null
+}
+
+function readJsonValueEnd(text: string, start: number): number | null {
+  if (text[start] === '"') return readStringEnd(text, start)
+  if (text[start] === '{' || text[start] === '[') {
+    const closers: string[] = [text[start] === '{' ? '}' : ']']
+    let inString = false
+    let escaped = false
+    for (let index = start + 1; index < text.length; index += 1) {
+      const character = text[index]
+      if (inString) {
+        if (escaped) escaped = false
+        else if (character === '\\') escaped = true
+        else if (character === '"') inString = false
+        continue
+      }
+      if (character === '"') inString = true
+      else if (character === '{') closers.push('}')
+      else if (character === '[') closers.push(']')
+      else if (character === '}' || character === ']') {
+        if (closers.pop() !== character) return null
+        if (!closers.length) return index + 1
+      }
+    }
+    return null
+  }
+  let index = start
+  while (index < text.length && !/[\s,}\]]/.test(text[index])) index += 1
+  return index > start ? index : null
+}
+
+function rawTopLevelStravaId(text: string, field: 'object_id' | 'owner_id'): string | null {
+  let index = skipWhitespace(text, 0)
+  if (text[index] !== '{') return null
+  index += 1
+  let found: string | null = null
+  let seen = false
+
+  while (index < text.length) {
+    index = skipWhitespace(text, index)
+    if (text[index] === '}') return found
+    const keyEnd = readStringEnd(text, index)
+    if (keyEnd === null) return null
+    let key: unknown
+    try { key = JSON.parse(text.slice(index, keyEnd)) } catch { return null }
+    index = skipWhitespace(text, keyEnd)
+    if (text[index] !== ':') return null
+    index = skipWhitespace(text, index + 1)
+    const valueEnd = readJsonValueEnd(text, index)
+    if (valueEnd === null) return null
+
+    if (key === field) {
+      if (seen) return null
+      seen = true
+      const rawValue = text.slice(index, valueEnd)
+      let candidate: unknown = rawValue
+      if (rawValue.startsWith('"')) {
+        try { candidate = JSON.parse(rawValue) } catch { return null }
+      } else if (!/^\d+$/.test(rawValue)) {
+        return null
+      }
+      if (typeof candidate !== 'string') return null
+      found = getStravaId({ id_str: candidate })
+      if (!found) return null
+    }
+
+    index = skipWhitespace(text, valueEnd)
+    if (text[index] === ',') index += 1
+    else if (text[index] === '}') return found
+    else return null
+  }
+  return null
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url)
   const verifyToken = url.searchParams.get('hub.verify_token') ?? ''
@@ -65,18 +155,23 @@ export async function POST(request: Request) {
   }
   const rawBody = await readBodyWithinLimit(request, 64 * 1024)
   if (rawBody === null) return Response.json({ error: 'Invalid event' }, { status: 413, headers: { 'Cache-Control': 'no-store' } })
-  let payload: StravaWebhookPayload
-  try { payload = JSON.parse(rawBody) as StravaWebhookPayload } catch { return Response.json({ error: 'Invalid event' }, { status: 400, headers: { 'Cache-Control': 'no-store' } }) }
-  const validId = (value: unknown) => Number.isSafeInteger(value) && Number(value) > 0
+  let parsedPayload: unknown
+  try { parsedPayload = JSON.parse(rawBody) } catch { return Response.json({ error: 'Invalid event' }, { status: 400, headers: { 'Cache-Control': 'no-store' } }) }
+  if (!parsedPayload || typeof parsedPayload !== 'object' || Array.isArray(parsedPayload)) {
+    return Response.json({ error: 'Invalid event' }, { status: 400, headers: { 'Cache-Control': 'no-store' } })
+  }
+  const objectId = rawTopLevelStravaId(rawBody, 'object_id')
+  const ownerId = rawTopLevelStravaId(rawBody, 'owner_id')
+  if (!objectId || !ownerId) return Response.json({ error: 'Invalid event' }, { status: 400, headers: { 'Cache-Control': 'no-store' } })
+  const payload = { ...(parsedPayload as Record<string, unknown>), object_id: objectId, owner_id: ownerId } as StravaWebhookPayload
+  const validEventNumber = (value: unknown) => Number.isSafeInteger(value) && Number(value) > 0
   const nowSeconds = Math.floor(Date.now() / 1000)
   if (
     !payload ||
     !['activity', 'athlete'].includes(payload.object_type) ||
     !['create', 'update', 'delete'].includes(payload.aspect_type) ||
-    !validId(payload.object_id) ||
-    !validId(payload.owner_id) ||
-    !validId(payload.subscription_id) ||
-    !validId(payload.event_time) ||
+    !validEventNumber(payload.subscription_id) ||
+    !validEventNumber(payload.event_time) ||
     Number(payload.event_time) > nowSeconds + 300 ||
     (payload.updates !== undefined && (!payload.updates || typeof payload.updates !== 'object' || Array.isArray(payload.updates)))
   ) return Response.json({ error: 'Invalid event' }, { status: 400, headers: { 'Cache-Control': 'no-store' } })
