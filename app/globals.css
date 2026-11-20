@@ -242,11 +242,14 @@ h1, h2, h3 { font-family: 'Manrope', 'DM Sans', sans-serif; letter-spacing: -.6p
 .wellness-form-card, .profile-form-card { padding: 23px; background: white; border: 1px solid var(--line); border-radius: 14px; }
 .wellness-form-card .section-heading, .profile-form-card .section-heading { margin-bottom: 12px; }.wellness-form-card .section-heading h2, .profile-form-card .section-heading h2 { font-size: 19px; }
 .wellness-form-card > .muted { margin-bottom: 20px; max-width: 590px; }
-.wellness-form-date { display: flex; align-items: center; gap: 9px; width: fit-content; max-width: 100%; margin: 2px 0 18px; padding: 8px 11px; border: 1px solid #e4ebef; border-radius: 9px; background: #f7fafb; color: #728596; }
+.wellness-form-meta { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin: 2px 0 18px; }
+.wellness-form-date { display: flex; align-items: center; gap: 9px; width: fit-content; max-width: 100%; padding: 8px 11px; border: 1px solid #e4ebef; border-radius: 9px; background: #f7fafb; color: #728596; }
 .wellness-form-date > svg { flex: 0 0 auto; color: #8296a6; }
 .wellness-form-date > span { display: flex; align-items: baseline; flex-wrap: wrap; gap: 3px 8px; }
 .wellness-form-date small { color: #738596; font-size: 9px; font-weight: 600; }
 .wellness-form-date strong { color: var(--ink); font-size: 11px; font-weight: 700; text-transform: capitalize; }
+.wellness-sharing-note { display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px; border: 1px solid #e4ecd9; border-radius: 8px; background: #f2f7e9; color: #566e42; font-size: 10px; font-weight: 600; line-height: 1.35; }
+.wellness-sharing-note svg { flex: 0 0 auto; color: #78985d; }
 .wellness-icon-large { width: 39px; height: 39px; display: grid; place-items: center; background: #fbefe9; border-radius: 10px; color: #c77c5a; }
 .wellness-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 14px; }
 .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }.field.full, .full { grid-column: 1 / -1; }.field > span { color: #59655d; font-size: 10px; font-weight: 700; }.field > span small { color: #a0a8a1; font-size: 9px; font-weight: 500; margin-left: 3px; }
