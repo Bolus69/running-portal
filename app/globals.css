@@ -254,8 +254,25 @@ h1, h2, h3 { font-family: 'Manrope', 'DM Sans', sans-serif; letter-spacing: -.6p
 .recovery-select { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }.recovery-select button { display: flex; align-items: center; flex-direction: column; gap: 4px; border: 1px solid #e5e9e2; background: #fff; border-radius: 8px; padding: 9px 4px; color: #859087; }.recovery-select button span { font-family: 'Manrope', sans-serif; font-weight: 800; font-size: 14px; color: #54634f; }.recovery-select button small { font-size: 8px; }.recovery-select button.selected { background: var(--lime-soft); border-color: #bdd98c; }.recovery-select button.selected span { color: #486c36; }
 .privacy-toggle { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border: 1px solid #e6ebe4; border-radius: 9px; background: #fafbf8; }.privacy-toggle input, .optional-setting input { accent-color: #83b84f; width: 15px; height: 15px; }.privacy-toggle span { display: flex; flex-direction: column; flex: 1; }.privacy-toggle strong, .optional-setting strong { font-size: 10px; }.privacy-toggle small, .optional-setting small { color: #8a948a; font-size: 9px; margin-top: 2px; }.privacy-toggle svg { color: #97a48e; }
 .form-actions { display: flex; align-items: center; gap: 11px; }.form-actions > span { color: #9aa39b; font-size: 9px; }
-.wellness-side { display: grid; gap: 12px; }.privacy-card { padding: 19px; border: 1px solid #e8eee0; border-radius: 13px; background: #eff4e8; }.privacy-card h3 { font-size: 15px; margin: 11px 0 6px; }.privacy-card p { color: #72806e; font-size: 10px; margin: 0 0 12px; }.privacy-points { display: grid; gap: 7px; color: #64745e; font-size: 9px; }.privacy-points span { display: flex; align-items: center; gap: 6px; }.privacy-points svg { color: #709e4d; }
-.wellness-history { padding: 18px; background: white; border: 1px solid var(--line); border-radius: 12px; }.wellness-history > p { margin: 9px 0 0; }.wellness-entry { display: grid; gap: 4px; padding-top: 12px; color: #758077; font-size: 9px; }.wellness-entry strong { color: var(--ink); font-size: 11px; }.wellness-entry.compact { border-top: 1px solid #eef0ed; padding: 9px 0 0; margin-top: 9px; grid-template-columns: auto 1fr; align-items: baseline; }.wellness-entry.compact strong { font-size: 9px; }.wellness-entry-score { display: flex; align-items: center; gap: 8px; margin-top: 3px; }.wellness-entry-score small { color: #8a948b; font-size: 8px; }.effort-dots { display: inline-flex; gap: 3px; }.effort-dots i { width: 5px; height: 5px; display: inline-block; background: #dde2dc; border-radius: 50%; }.effort-dots i.active { background: #8bb757; }
+.wellness-side { display: grid; gap: 12px; }
+.wellness-history { padding: 18px; background: white; border: 1px solid var(--line); border-radius: 12px; }
+.wellness-diary-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 13px; }
+.wellness-diary-heading .eyebrow { margin: 0 0 3px; }
+.wellness-diary-heading h2 { margin: 0; color: var(--ink); font-size: 17px; }
+.wellness-diary-heading > span { padding: 5px 8px; border-radius: 99px; background: #eff5e6; color: #526b42; font-size: 10px; font-weight: 700; white-space: nowrap; }
+.wellness-diary-list { display: grid; gap: 9px; max-height: 660px; overflow-y: auto; padding-right: 3px; }
+.wellness-diary-entry { display: grid; gap: 9px; padding: 12px; border: 1px solid #e7ece3; border-radius: 9px; background: #fbfcfa; }
+.wellness-diary-entry-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.wellness-diary-entry-heading strong { color: var(--ink); font-size: 11px; }
+.wellness-diary-entry-heading > span { padding: 3px 6px; border-radius: 99px; color: #687773; background: #f0f2ef; font-size: 8px; white-space: nowrap; }
+.wellness-diary-entry-heading > span.shared { color: #4b7043; background: #edf5e4; }
+.wellness-diary-metrics { display: flex; flex-wrap: wrap; gap: 8px 14px; }
+.wellness-diary-metrics > span { display: grid; gap: 2px; align-content: start; }
+.wellness-diary-metrics small { color: #778578; font-size: 8px; }
+.wellness-diary-metrics strong { color: #344b3b; font-size: 10px; }
+.wellness-diary-note { margin: 0; padding-top: 8px; border-top: 1px solid #e9ede6; color: #5e6e62; font-size: 10px; line-height: 1.5; }
+.wellness-diary-empty { margin: 0; padding: 14px; color: #647386; background: #f6f8f7; border-radius: 8px; font-size: 11px; line-height: 1.5; }
+.wellness-entry { display: grid; gap: 4px; padding-top: 12px; color: #758077; font-size: 9px; }.wellness-entry strong { color: var(--ink); font-size: 11px; }.wellness-entry.compact { border-top: 1px solid #eef0ed; padding: 9px 0 0; margin-top: 9px; grid-template-columns: auto 1fr; align-items: baseline; }.wellness-entry.compact strong { font-size: 9px; }.wellness-entry-score { display: flex; align-items: center; gap: 8px; margin-top: 3px; }.wellness-entry-score small { color: #8a948b; font-size: 8px; }.effort-dots { display: inline-flex; gap: 3px; }.effort-dots i { width: 5px; height: 5px; display: inline-block; background: #dde2dc; border-radius: 50%; }.effort-dots i.active { background: #8bb757; }
 
 .profile-layout { display: grid; grid-template-columns: minmax(0,1.3fr) minmax(250px,.75fr); gap: 20px; align-items: start; }.profile-form-card { display: grid; gap: 15px; }
 .plan-timing-note { margin: -4px 0 0; color: #748394; font-size: 10px; line-height: 1.5; }.plan-timing-note.warning { color: #b95b48; }.plan-length-options button:disabled, .day-options button:disabled { cursor: not-allowed; opacity: .62; }.profile-avatar { width: 36px; height: 36px; font-size: 14px; }.form-row { display: flex; gap: 11px; }.form-row > .field { flex: 1; }.plan-length-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }.plan-length-options button { display: flex; gap: 4px; align-items: baseline; justify-content: center; border: 1px solid #e3e8e0; border-radius: 8px; background: white; padding: 9px; color: #708071; }.plan-length-options button strong { color: var(--ink); font-family: 'Manrope', sans-serif; font-size: 16px; }.plan-length-options button span { font-size: 9px; }.plan-length-options button.selected { background: var(--lime-soft); border-color: #c4dc9c; }.day-options { display: flex; gap: 7px; }.day-options button { min-width: 35px; height: 35px; border: 1px solid #e4e9e2; border-radius: 8px; color: #758176; background: white; font-size: 10px; font-weight: 700; }.day-options button.selected { background: var(--forest); color: var(--lime); border-color: var(--forest); }
@@ -284,6 +301,10 @@ h1, h2, h3 { font-family: 'Manrope', 'DM Sans', sans-serif; letter-spacing: -.6p
 @media (max-width: 520px) { .login-card { padding: 26px 20px; border-radius: 14px; }.login-brand { margin-bottom: 24px; } }
 .shared-wellness { display: grid; gap: 6px; margin: 13px 0 22px; padding: 14px 16px; border: 1px solid #e8eee0; border-radius: 10px; background: #f4f7ef; color: #74806e; font-size: 9px; }
 .shared-wellness strong { color: #4d6049; font-size: 10px; }
+.shared-wellness.coach-wellness-diary { gap: 0; padding: 18px; }
+.source-completed { color: #426342; background: #edf5e4; }
+.completed-workout-note { margin-top: 7px; }
+@media (max-width: 620px) { .wellness-diary-list { max-height: 520px; }.wellness-diary-entry-heading { align-items: flex-start; flex-direction: column; }.wellness-diary-entry-heading > span { align-self: flex-start; } }
 
 @media (max-width: 1120px) {
   .app-shell { grid-template-columns: 220px minmax(0,1fr); }.sidebar { padding-left: 14px; padding-right: 14px; }.content-grid { grid-template-columns: minmax(0,1.35fr) minmax(230px,.75fr); gap: 17px; }.stat-grid { gap: 8px; }.stat-card { padding: 12px; }.stat-copy strong { font-size: 18px; }.risk-indicator { font-size: 7px; }.athlete-row-progress { width: 86px; }
@@ -387,8 +408,12 @@ body { font-size: 15px; line-height: 1.6; }
 .activity-upload-note { color: #7d897b; font-size: 9px; line-height: 1.5; }
 .activity-upload-selected { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #496238; font-size: 10px; }
 .activity-upload-error { padding: 9px 11px; color: #9e5240; background: #fff2ef; border: 1px solid #f1d3cc; border-radius: 8px; font-size: 10px; line-height: 1.45; }
-.fit-upload-guide { color: #526477; font-size: 12px; line-height: 1.55; }
-.fit-upload-guide a { color: #235b84; font-weight: 700; text-underline-offset: 2px; }
+.fit-upload-guide { display: grid; gap: 7px; margin-top: 9px; padding: 11px 13px; border: 1px solid #dbe5ec; border-radius: 8px; background: #f4f8fa; color: #43596c; font-size: 11px; line-height: 1.5; }
+.fit-upload-guide strong { color: #263e53; font-size: 11px; }
+.fit-upload-guide a { color: #235b84; text-underline-offset: 2px; }
+.fit-upload-guide ol { display: grid; gap: 3px; margin: 0; padding-left: 19px; }
+.fit-upload-guide p { margin: 0; color: #647386; }
+.fit-upload-guide b { color: #263e53; }
 @media (max-width: 620px) {
   body { font-size: 14px; }
   .page-subtitle { font-size: 12px; }
