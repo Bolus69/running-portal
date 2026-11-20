@@ -76,7 +76,7 @@ export function createDemoData(now = new Date()): DashboardData {
     noor: generatePlan({ marathonDate: noorMarathonDate, length: 20, trainingDays: [2, 4, 0], includeOptionalFourth: true, optionalTrainingDay: 6, goalTimeSeconds: 4 * 3600 + 20 * 60 }),
   }
   return {
-    profile: { id: 'demo-athlete', name: 'Demo-atleet', role: 'athlete' },
+    profile: { id: 'athlete-1', name: 'Demo-atleet', role: 'athlete', email: 'demo-atleet@example.test', age: 38 },
     plan: {
       length: 16,
       marathonDate,
@@ -93,6 +93,8 @@ export function createDemoData(now = new Date()): DashboardData {
       {
         id: 'athlete-1',
         name: 'Demo-atleet',
+        email: 'demo-atleet@example.test',
+        age: 38,
         marathonDate,
         goalTime: '04:00:00',
         planLength: 16,
@@ -112,6 +114,8 @@ export function createDemoData(now = new Date()): DashboardData {
       {
         id: 'athlete-2',
         name: 'Joris van Dijk',
+        email: 'joris@example.test',
+        age: 34,
         marathonDate,
         goalTime: '03:45:00',
         planLength: 16,
@@ -132,6 +136,8 @@ export function createDemoData(now = new Date()): DashboardData {
       {
         id: 'athlete-3',
         name: 'Noor Bakker',
+        email: 'noor@example.test',
+        age: 31,
         marathonDate: noorMarathonDate,
         goalTime: '04:20:00',
         planLength: 20,

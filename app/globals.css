@@ -594,3 +594,36 @@ body { font-size: 15px; line-height: 1.6; }
   .plan-overview-export-row { margin-top: 10px; }
   .plan-export-trigger { padding: 7px 10px; font-size: 10px; }
 }
+
+/* Coach overview and athlete profile tabs */
+.coach-view { display: grid; gap: 18px; }
+.coach-overview-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.coach-athletes-panel { padding: 20px 22px; }
+.profile-main-column { display: grid; gap: 14px; min-width: 0; }
+.athlete-profile-stack { display: grid; gap: 14px; width: min(900px, 100%); }
+.athlete-personal-card { align-content: start; }
+.athlete-personal-card .section-heading { margin-bottom: 0; }
+.athlete-detail-tabs { display: flex; gap: 5px; margin: 0 0 14px; padding: 5px; overflow-x: auto; border: 1px solid var(--line); border-radius: 11px; background: #fff; }
+.athlete-detail-tabs button { display: inline-flex; flex: 1 0 auto; align-items: center; justify-content: center; gap: 7px; min-height: 39px; padding: 8px 13px; border: 0; border-radius: 7px; color: var(--muted); background: transparent; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.athlete-detail-tabs button:hover { color: var(--ink); background: #f4f7f8; }
+.athlete-detail-tabs button.active { color: #fff; background: var(--forest); }
+.athlete-detail-panel { display: grid; gap: 14px; min-width: 0; }
+.athlete-identity-card { padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+.athlete-identity-card .section-heading { margin-bottom: 13px; }
+.athlete-identity-card .section-heading h2 { margin: 0; font-size: 17px; }
+.athlete-identity-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.athlete-identity-grid > div { display: grid; gap: 3px; min-width: 0; padding: 10px 11px; border: 1px solid #edf0ec; border-radius: 8px; background: #fafbf9; }
+.athlete-identity-grid small { color: var(--muted); font-size: 9px; }
+.athlete-identity-grid strong { overflow-wrap: anywhere; font-size: 11px; }
+@media (max-width: 900px) {
+  .coach-overview-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 620px) {
+  .coach-overview-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .coach-athletes-panel { padding: 14px 11px; }
+  .athlete-detail-tabs { margin-bottom: 11px; }
+  .athlete-detail-tabs button { min-height: 36px; padding: 7px 10px; font-size: 10px; }
+  .athlete-detail-tabs button svg { width: 14px; height: 14px; }
+  .athlete-identity-card { padding: 14px; }
+  .athlete-identity-grid { grid-template-columns: 1fr; }
+}

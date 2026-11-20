@@ -12,6 +12,14 @@ function numberValue(value: unknown): number | undefined {
   return Number.isFinite(number) && value !== null && value !== undefined ? number : undefined
 }
 
+function athleteProfileAge(value: unknown): number | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const athleteProfile = (value as Row).athleteProfile
+  if (!athleteProfile || typeof athleteProfile !== 'object' || Array.isArray(athleteProfile)) return undefined
+  const age = Number((athleteProfile as Row).age)
+  return Number.isInteger(age) && age >= 1 && age <= 120 ? age : undefined
+}
+
 function timeLabel(secondsValue: unknown): string {
   const seconds = Math.round(numberValue(secondsValue) ?? 0)
   const hours = Math.floor(seconds / 3600)
@@ -267,12 +275,16 @@ async function loadCoachData(supabase: Awaited<ReturnType<typeof import('@/lib/s
     }
   }
   const [profileResult, suggestionResult, noteResult] = await Promise.all([
-    athleteIds.length ? supabase.from('profiles').select('id,full_name').in('id', athleteIds) : Promise.resolve({ data: [] }),
+    athleteIds.length ? supabase.from('profiles').select('id,full_name,preferences').in('id', athleteIds) : Promise.resolve({ data: [] }),
     supabase.from('coach_suggestions').select('*').eq('coach_id', userId).order('created_at', { ascending: false }).limit(50),
     athleteIds.length ? supabase.from('coach_notes').select('id,athlete_id,note,created_at').eq('coach_id', userId).in('athlete_id', athleteIds).order('created_at', { ascending: false }).limit(100) : Promise.resolve({ data: [] }),
   ])
   const profiles = ((profileResult.data ?? []) as unknown as Row[])
   const nameById = new Map(profiles.map((profile) => [String(profile.id), String(profile.full_name || 'Atleet')]))
+  const ageById = new Map(profiles.flatMap((profile) => {
+    const age = athleteProfileAge(profile.preferences)
+    return age === undefined ? [] : [[String(profile.id), age] as const]
+  }))
   const notesByAthlete = new Map<string, { id: string; note: string; createdAt: string }[]>()
   for (const row of (noteResult.data ?? []) as unknown as Row[]) {
     const athleteId = String(row.athlete_id)
@@ -293,6 +305,7 @@ async function loadCoachData(supabase: Awaited<ReturnType<typeof import('@/lib/s
       id: athleteId,
       name: nameById.get(athleteId) ?? 'Atleet',
       email: emailByAthleteId.get(athleteId),
+      age: ageById.get(athleteId),
       marathonDate,
       goalTime: plan?.goalTime ?? '',
       planLength: plan?.length ?? 16,
@@ -354,10 +367,10 @@ export async function loadDashboardData(): Promise<DashboardData> {
   const { data: authData, error: authError } = await supabase.auth.getUser()
   if (authError || !authData.user) throw new Error('Je sessie is verlopen. Log opnieuw in.')
   const user = authData.user
-  const { data: profileData } = await supabase.from('profiles').select('id,full_name,role').eq('id', user.id).maybeSingle()
+  const { data: profileData } = await supabase.from('profiles').select('id,full_name,role,preferences').eq('id', user.id).maybeSingle()
   let profile = profileData as unknown as Row | null
   if (!profile) {
-    const { data: createdProfile, error } = await supabase.from('profiles').insert({ id: user.id, full_name: String(user.user_metadata.full_name ?? user.email ?? '') }).select('id,full_name,role').single()
+    const { data: createdProfile, error } = await supabase.from('profiles').insert({ id: user.id, full_name: String(user.user_metadata.full_name ?? user.email ?? '') }).select('id,full_name,role,preferences').single()
     if (error) throw new Error('Je profiel kan nog niet worden aangemaakt. Controleer of de databasemigratie is toegepast.')
     profile = createdProfile as unknown as Row
   }
@@ -377,7 +390,7 @@ export async function loadDashboardData(): Promise<DashboardData> {
     createdAt: String(row.created_at),
   }))
   return {
-    profile: { id: user.id, name: fullName, role },
+    profile: { id: user.id, name: fullName, role, email: user.email, age: athleteProfileAge(profile.preferences) },
     plan,
     activities,
     wellness,
