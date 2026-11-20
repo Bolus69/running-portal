@@ -242,6 +242,11 @@ h1, h2, h3 { font-family: 'Manrope', 'DM Sans', sans-serif; letter-spacing: -.6p
 .wellness-form-card, .profile-form-card { padding: 23px; background: white; border: 1px solid var(--line); border-radius: 14px; }
 .wellness-form-card .section-heading, .profile-form-card .section-heading { margin-bottom: 12px; }.wellness-form-card .section-heading h2, .profile-form-card .section-heading h2 { font-size: 19px; }
 .wellness-form-card > .muted { margin-bottom: 20px; max-width: 590px; }
+.wellness-form-date { display: flex; align-items: center; gap: 9px; width: fit-content; max-width: 100%; margin: 2px 0 18px; padding: 8px 11px; border: 1px solid #e4ebef; border-radius: 9px; background: #f7fafb; color: #728596; }
+.wellness-form-date > svg { flex: 0 0 auto; color: #8296a6; }
+.wellness-form-date > span { display: flex; align-items: baseline; flex-wrap: wrap; gap: 3px 8px; }
+.wellness-form-date small { color: #738596; font-size: 9px; font-weight: 600; }
+.wellness-form-date strong { color: var(--ink); font-size: 11px; font-weight: 700; text-transform: capitalize; }
 .wellness-icon-large { width: 39px; height: 39px; display: grid; place-items: center; background: #fbefe9; border-radius: 10px; color: #c77c5a; }
 .wellness-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 14px; }
 .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }.field.full, .full { grid-column: 1 / -1; }.field > span { color: #59655d; font-size: 10px; font-weight: 700; }.field > span small { color: #a0a8a1; font-size: 9px; font-weight: 500; margin-left: 3px; }
@@ -252,7 +257,7 @@ h1, h2, h3 { font-family: 'Manrope', 'DM Sans', sans-serif; letter-spacing: -.6p
 .quick-effort-options button.selected { border-color: #8dad4f; background: #eaf5d4; color: #284127; box-shadow: inset 0 0 0 1px #b7d88a, 0 0 0 2px rgba(201,243,107,.18); font-weight: 700; }
 .quick-effort-options button:focus-visible { outline: 2px solid #769e41; outline-offset: 2px; }
 .recovery-select { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }.recovery-select button { display: flex; align-items: center; flex-direction: column; gap: 4px; border: 1px solid #e5e9e2; background: #fff; border-radius: 8px; padding: 9px 4px; color: #859087; }.recovery-select button span { font-family: 'Manrope', sans-serif; font-weight: 800; font-size: 14px; color: #54634f; }.recovery-select button small { font-size: 8px; }.recovery-select button.selected { background: var(--lime-soft); border-color: #bdd98c; }.recovery-select button.selected span { color: #486c36; }
-.privacy-toggle { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border: 1px solid #e6ebe4; border-radius: 9px; background: #fafbf8; }.privacy-toggle input, .optional-setting input { accent-color: #83b84f; width: 15px; height: 15px; }.privacy-toggle span { display: flex; flex-direction: column; flex: 1; }.privacy-toggle strong, .optional-setting strong { font-size: 10px; }.privacy-toggle small, .optional-setting small { color: #8a948a; font-size: 9px; margin-top: 2px; }.privacy-toggle svg { color: #97a48e; }
+.optional-setting input { accent-color: #83b84f; width: 15px; height: 15px; }.optional-setting strong { font-size: 10px; }.optional-setting small { color: #8a948a; font-size: 9px; margin-top: 2px; }
 .form-actions { display: flex; align-items: center; gap: 11px; }.form-actions > span { color: #9aa39b; font-size: 9px; }
 .wellness-side { display: grid; gap: 12px; }
 .wellness-history { padding: 18px; background: white; border: 1px solid var(--line); border-radius: 12px; }
@@ -442,7 +447,7 @@ body { font-size: 15px; line-height: 1.6; }
 .stat-copy small, .athlete-row-main small, .athlete-row-progress, .linked-activity-summary small { color: #56697d; font-size: 10px; }
 .status-pill, .optional-tag, .plan-row-date, .history-date span { font-size: 9px; }
 .wellness-entry, .wellness-entry.compact, .wellness-entry-score small { color: #536477; font-size: 10px; }
-.field > span small, .privacy-toggle small, .optional-setting small { color: #596d80; }
+.field > span small, .optional-setting small { color: #596d80; }
 @media (max-width: 620px) {
   .mobile-nav { gap: 2px; padding-inline: 4px; }
   .mobile-nav button { gap: 2px; padding: 5px 2px; font-size: 10px; }
