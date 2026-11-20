@@ -75,7 +75,7 @@ export function AcceptInviteForm({ url, publishableKey }: { url: string; publish
           tokenHash: '',
           errorMessage: authError ? flow === 'recovery'
             ? 'Deze herstel-link kan niet meer worden gebruikt. Hij kan verlopen zijn of al eerder zijn geopend. Vraag een nieuwe herstel-link aan.'
-            : 'Deze uitnodigingslink kan niet meer worden gebruikt. Hij kan verlopen zijn of al eerder zijn geopend. Vraag je coach om een nieuwe link.' : null,
+            : 'Deze uitnodigingslink is verlopen of al eerder gebruikt.' : null,
         }
       })()
     }
@@ -106,7 +106,7 @@ export function AcceptInviteForm({ url, publishableKey }: { url: string; publish
         setPendingTokenHash('')
         setErrorMessage(flow === 'recovery'
           ? 'De herstel-link is verlopen of al gebruikt. Vraag een nieuwe herstel-link aan.'
-          : 'De uitnodigingslink is verlopen of al gebruikt. Vraag je coach om een nieuwe link.')
+          : 'Deze uitnodigingslink is verlopen of al eerder gebruikt.')
         setState('invalid')
         return
       }
@@ -115,7 +115,7 @@ export function AcceptInviteForm({ url, publishableKey }: { url: string; publish
         setPendingTokenHash('')
         setErrorMessage(flow === 'recovery'
           ? 'De herstelsessie kon niet worden gestart. Vraag een nieuwe herstel-link aan.'
-          : 'De uitnodiging kon niet worden gecontroleerd. Vraag je coach om een nieuwe link.')
+          : 'De uitnodiging kon niet worden gecontroleerd.')
         setState('invalid')
         return
       }
@@ -127,7 +127,7 @@ export function AcceptInviteForm({ url, publishableKey }: { url: string; publish
       setPendingTokenHash('')
       setErrorMessage(flow === 'recovery'
         ? 'De herstel-link kon niet worden gecontroleerd. Vraag een nieuwe herstel-link aan.'
-        : 'De uitnodigingslink kon niet worden gecontroleerd. Vraag je coach om een nieuwe link.')
+        : 'De uitnodigingslink kon niet worden gecontroleerd.')
       setState('invalid')
     }
   }
@@ -143,7 +143,7 @@ export function AcceptInviteForm({ url, publishableKey }: { url: string; publish
     if (sessionError || !currentUser.user || currentUser.user.id !== inviteUserId) {
       setErrorMessage(flow === 'recovery'
         ? 'De herstelsessie is verlopen. Vraag een nieuwe herstel-link aan.'
-        : 'De uitnodigingssessie is verlopen. Vraag je coach om een nieuwe uitnodigingslink.')
+        : 'De uitnodigingssessie is verlopen.')
       setState('invalid')
       return
     }
@@ -159,7 +159,17 @@ export function AcceptInviteForm({ url, publishableKey }: { url: string; publish
 
   if (state === 'checking') return <p className="login-help" role="status">Link controleren…</p>
   if (state === 'confirm' || state === 'verifying') return <div className="login-form"><p className="login-help">{flow === 'recovery' ? 'Klik hieronder om je herstel-link te controleren en een nieuw wachtwoord te kiezen.' : 'Klik hieronder om je uitnodiging te controleren en je wachtwoord in te stellen.'}</p><button className="button button-primary full-width" type="button" onClick={() => void confirmLink()} disabled={state === 'verifying'}>{state === 'verifying' ? 'Link controleren…' : flow === 'recovery' ? 'Herstel-link gebruiken' : 'Uitnodiging accepteren'}</button></div>
-  if (state === 'invalid') return <div className="invite-invalid"><p className="login-error" role="alert">{errorMessage || (flow === 'recovery' ? 'Deze herstel-link kan niet meer worden gebruikt.' : 'Deze uitnodigingslink kan niet meer worden gebruikt.')}</p>{flow === 'recovery' ? <><p className="login-help">Vraag een nieuwe herstel-link aan en open die in dezelfde browser.</p><Link className="button button-outline full-width" href="/forgot-password">Nieuwe herstel-link aanvragen</Link></> : <><p className="login-help">Heb je je account al geactiveerd? Log dan in of vraag een nieuw wachtwoord aan. Is dit je eerste keer? Vraag je coach om een nieuwe uitnodiging en open die in dezelfde browser.</p><Link className="button button-outline full-width" href="/login">Naar inloggen</Link></>}</div>
+  if (state === 'invalid') return <div className="invite-invalid">
+    <p className="login-error" role="alert">{errorMessage || (flow === 'recovery' ? 'Deze herstel-link kan niet meer worden gebruikt.' : 'Deze uitnodigingslink is verlopen of al eerder gebruikt.')}</p>
+    {flow === 'recovery' ? <>
+      <p className="login-help">Vraag een nieuwe herstel-link aan en open die in dezelfde browser.</p>
+      <Link className="button button-outline full-width" href="/forgot-password">Nieuwe herstel-link aanvragen</Link>
+    </> : <>
+      <p className="login-help">Heb je al een account aangemaakt? Vraag hieronder direct een herstel-link aan om een nieuw wachtwoord in te stellen. Heb je nog geen account, vraag je coach dan om een nieuwe uitnodiging.</p>
+      <Link className="button button-primary full-width" href="/forgot-password">Nieuw wachtwoord aanvragen</Link>
+      <Link className="button button-outline full-width" href="/login">Naar inloggen</Link>
+    </>}
+  </div>
   if (state === 'saved') return flow === 'recovery'
     ? <div className="invite-invalid"><p className="invite-success" role="status">Je wachtwoord is opnieuw ingesteld. Je kunt nu verder met je account.</p><Link className="button button-primary full-width" href="/">Naar Marathon Coach</Link></div>
     : <p className="invite-success" role="status">Je wachtwoord is ingesteld. Je wordt doorgestuurd…</p>
