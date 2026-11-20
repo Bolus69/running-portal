@@ -12,7 +12,7 @@ import type { ActivityLap, AppRole, AthleteSummary, CoachNote, CoachSuggestion, 
 type View = 'week' | 'plan' | 'history' | 'wellness' | 'profile' | 'coach' | 'athletes' | 'suggestions' | 'athlete-detail'
 type ManualDraft = { name: string; date: string; duration: string; distance: string; heartRate: string; effort: string; note: string; plannedWorkoutId: string }
 type QuickFeedbackDraft = { effort: NonNullable<RunActivity['effort']> | ''; note: string }
-type WellnessDraft = { sleepHours: string; restingHeartRate: string; recoveryScore: string; note: string; visibleToCoach: boolean }
+type WellnessDraft = { sleepHours: string; restingHeartRate: string; recoveryScore: string; note: string }
 type ProfileDraft = { marathonDate: string; goalTime: string; planLength: 12 | 16 | 20; days: number[]; optional: boolean; optionalTrainingDay: number; raceTime: string; raceDistance: string; recentWeeklyKm: string; recentLongestRunKm: string }
 
 const TRAINING_DAYS = [{ value: 1, label: 'Ma' }, { value: 2, label: 'Di' }, { value: 3, label: 'Wo' }, { value: 4, label: 'Do' }, { value: 5, label: 'Vr' }, { value: 6, label: 'Za' }, { value: 0, label: 'Zo' }]
@@ -240,7 +240,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
   const [profileAthleteId, setProfileAthleteId] = useState<string | null>(initialData.profile.role === 'coach' ? null : initialData.athletes[0]?.id ?? null)
   const [draft, setDraft] = useState<ManualDraft>({ name: '', date: todayDateISO(), duration: '', distance: '', heartRate: '', effort: '', note: '', plannedWorkoutId: '' })
   const [lapDrafts, setLapDrafts] = useState<ActivityLap[]>([])
-  const [wellnessDraft, setWellnessDraft] = useState<WellnessDraft>({ sleepHours: '', restingHeartRate: '', recoveryScore: '', note: '', visibleToCoach: false })
+  const [wellnessDraft, setWellnessDraft] = useState<WellnessDraft>({ sleepHours: '', restingHeartRate: '', recoveryScore: '', note: '' })
   const [profileDraft, setProfileDraft] = useState<ProfileDraft>({ marathonDate: initialData.plan?.marathonDate ?? '', goalTime: initialData.plan?.goalTime ?? '', planLength: initialData.plan?.length ?? 16, days: initialData.plan?.trainingDays ?? [2, 4, 0], optional: initialData.plan?.includeOptionalFourth ?? false, optionalTrainingDay: initialData.plan?.optionalTrainingDay ?? 6, raceTime: raceTimeInput(initialData.plan?.recentRaceTimeSeconds), raceDistance: initialData.plan?.recentRaceDistanceKm ? String(initialData.plan.recentRaceDistanceKm) : '', recentWeeklyKm: initialData.plan?.recentWeeklyKm ? String(initialData.plan.recentWeeklyKm) : '', recentLongestRunKm: initialData.plan?.recentLongestRunKm ? String(initialData.plan.recentLongestRunKm) : '' })
   const [coachPlanDraft, setCoachPlanDraft] = useState<ProfileDraft>({ marathonDate: '', goalTime: '04:00:00', planLength: 16, days: [2, 4, 0], optional: false, optionalTrainingDay: 6, raceTime: '', raceDistance: '', recentWeeklyKm: '', recentLongestRunKm: '' })
 
@@ -452,7 +452,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
       restingHeartRate: wellnessDraft.restingHeartRate ? Number(wellnessDraft.restingHeartRate) : undefined,
       recoveryScore: wellnessDraft.recoveryScore ? Number(wellnessDraft.recoveryScore) : undefined,
       note: wellnessDraft.note.trim() || undefined,
-      visibleToCoach: wellnessDraft.visibleToCoach,
+      visibleToCoach: false,
     }
     if (!demoMode) {
       try {
@@ -464,8 +464,8 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
       }
     }
     setData((current) => ({ ...current, wellness: [entry, ...current.wellness.filter((item) => item.date !== entry.date)] }))
-    setWellnessDraft({ sleepHours: '', restingHeartRate: '', recoveryScore: '', note: '', visibleToCoach: false })
-    showToast('Herstelgegevens opgeslagen. Bedankt voor het delen.')
+    setWellnessDraft({ sleepHours: '', restingHeartRate: '', recoveryScore: '', note: '' })
+    showToast('Herstelgegevens opgeslagen.')
   }
 
   async function savePlan(event: React.FormEvent<HTMLFormElement>) {
@@ -1325,13 +1325,12 @@ function WellnessView({ wellness, draft, setDraft, onSubmit }: { wellness: Welln
           <div><h2>Hoe is je herstel?</h2></div>
           <span className="wellness-icon-large"><Icon name="heart" size={22} /></span>
         </div>
-        <div className="wellness-form-date"><Icon name="clock" size={16} /><span>Datum van invoer: <strong>{dateLabel(entryDate, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</strong>. Deze datum wordt bij opslaan vastgelegd.</span></div>
+        <div className="wellness-form-date"><Icon name="clock" size={16} /><span><small>Invoerdatum</small><strong>{dateLabel(entryDate, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</strong></span></div>
         <form onSubmit={onSubmit} className="wellness-form">
           <label className="field"><span>Slaapduur <small>uur</small></span><input type="number" min="0" max="24" step="0.25" value={draft.sleepHours} onChange={(event) => setDraft({ ...draft, sleepHours: event.target.value })} placeholder="Bijv. 7,5" /></label>
           <label className="field"><span>Rusthartslag <small>bpm</small></span><input type="number" min="25" max="220" value={draft.restingHeartRate} onChange={(event) => setDraft({ ...draft, restingHeartRate: event.target.value })} placeholder="Bijv. 54" /></label>
           <div className="field full"><span>Herstelgevoel</span><div className="recovery-select">{RECOVERY_LABELS.map((label, index) => { const value = index + 1; return <button type="button" key={value} aria-label={'Herstelgevoel: ' + label} aria-pressed={draft.recoveryScore === String(value)} className={'mood-' + value + (draft.recoveryScore === String(value) ? ' selected' : '')} onClick={() => setDraft({ ...draft, recoveryScore: draft.recoveryScore === String(value) ? '' : String(value) })}><span className="recovery-icon"><Icon name={'mood' + value} size={22} /></span><small>{label}</small></button> })}</div></div>
           <label className="field full"><span>Korte opmerking <small>optioneel</small></span><textarea rows={3} value={draft.note} onChange={(event) => setDraft({ ...draft, note: event.target.value })} placeholder="Bijvoorbeeld: drukke werkweek, voelde me fris tijdens het lopen" /></label>
-          <label className="privacy-toggle full"><input type="checkbox" checked={draft.visibleToCoach} onChange={(event) => setDraft({ ...draft, visibleToCoach: event.target.checked })} /><span><strong>Deel deze gegevens met mijn coach</strong><small>Deze optie staat standaard uit. Je kunt dit per invoer aanpassen.</small></span><Icon name="shield" size={18} /></label>
           <div className="form-actions full"><button className="button button-primary">Opslaan</button></div>
         </form>
       </section>
