@@ -452,7 +452,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
       restingHeartRate: wellnessDraft.restingHeartRate ? Number(wellnessDraft.restingHeartRate) : undefined,
       recoveryScore: wellnessDraft.recoveryScore ? Number(wellnessDraft.recoveryScore) : undefined,
       note: wellnessDraft.note.trim() || undefined,
-      visibleToCoach: false,
+      visibleToCoach: true,
     }
     if (!demoMode) {
       try {
@@ -465,7 +465,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
     }
     setData((current) => ({ ...current, wellness: [entry, ...current.wellness.filter((item) => item.date !== entry.date)] }))
     setWellnessDraft({ sleepHours: '', restingHeartRate: '', recoveryScore: '', note: '' })
-    showToast('Herstelgegevens opgeslagen.')
+    showToast('Herstelgegevens opgeslagen en gedeeld met je coach.')
   }
 
   async function savePlan(event: React.FormEvent<HTMLFormElement>) {
@@ -1325,7 +1325,7 @@ function WellnessView({ wellness, draft, setDraft, onSubmit }: { wellness: Welln
           <div><h2>Hoe is je herstel?</h2></div>
           <span className="wellness-icon-large"><Icon name="heart" size={22} /></span>
         </div>
-        <div className="wellness-form-date"><Icon name="clock" size={16} /><span><small>Invoerdatum</small><strong>{dateLabel(entryDate, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</strong></span></div>
+        <div className="wellness-form-meta"><div className="wellness-form-date"><Icon name="clock" size={16} /><span><small>Invoerdatum</small><strong>{dateLabel(entryDate, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</strong></span></div><span className="wellness-sharing-note"><Icon name="shield" size={14} /> Je coach kan deze gegevens zien</span></div>
         <form onSubmit={onSubmit} className="wellness-form">
           <label className="field"><span>Slaapduur <small>uur</small></span><input type="number" min="0" max="24" step="0.25" value={draft.sleepHours} onChange={(event) => setDraft({ ...draft, sleepHours: event.target.value })} placeholder="Bijv. 7,5" /></label>
           <label className="field"><span>Rusthartslag <small>bpm</small></span><input type="number" min="25" max="220" value={draft.restingHeartRate} onChange={(event) => setDraft({ ...draft, restingHeartRate: event.target.value })} placeholder="Bijv. 54" /></label>
