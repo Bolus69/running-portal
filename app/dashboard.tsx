@@ -878,7 +878,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
           {view === 'coach' && <CoachView data={data} onAthlete={openCoachAthlete} onInvite={() => setModal('invite')} />}
           {view === 'athlete-detail' && selectedAthlete && <AthleteDetail key={selectedAthlete.id} athlete={selectedAthlete} onBack={() => go('coach')} onSetupPlan={() => openCoachPlan(selectedAthlete)} onAddNote={addCoachNote} profileContent={<ProfileView data={data} role="coach" athletes={data.athletes} selectedAthlete={selectedAthlete} onSelectAthlete={selectProfileAthlete} draft={profileDraft} setDraft={setProfileDraft} paces={paces} onSubmit={saveCoachProfile} />} onRemove={() => { setDeleteAthleteConfirmation(''); setModal('delete-athlete') }} canRemove={!demoMode} />}
         </div>
-        <footer className="page-footer"><span>{BRAND.appName} <b>·</b> {BRAND.byline}</span><span>Trainingsschema is een richtlijn, geen diagnose.</span></footer>
+        <footer className="page-footer"><a href="/installeren">App installeren</a><span>{BRAND.appName} <b>·</b> {BRAND.byline}</span><span>Trainingsschema is een richtlijn, geen diagnose.</span></footer>
       </main>
 
       <nav className="mobile-nav" aria-label="Mobiele hoofdnavigatie">{mobileNavItems.map((item) => <button type="button" key={item.id} aria-label={item.label} aria-current={view === item.id || (view === 'athlete-detail' && item.id === 'coach') ? 'page' : undefined} className={view === item.id || (view === 'athlete-detail' && item.id === 'coach') ? 'active' : ''} onClick={() => go(item.id)}>{item.icon === 'appLogo' ? <LogoMark small /> : <Icon name={item.icon} size={18} />}<span>{item.mobileLabel}</span></button>)}</nav>

@@ -632,3 +632,20 @@ body { font-size: 15px; line-height: 1.6; }
   .athlete-identity-card { padding: 14px; }
   .athlete-identity-grid { grid-template-columns: 1fr; }
 }
+
+/* Installed app and public installation guide. */
+body { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+.connection-banner { position: sticky; top: 0; z-index: 200; padding: 12px 20px; color: #193d55; background: #fff0ba; text-align: center; font-size: 14px; }
+.install-page { min-height: 100svh; padding: 36px 20px; background: #f2f7fa; }
+.install-card { max-width: 960px; margin: auto; padding: clamp(24px,5vw,56px); background: #fff; border: 1px solid #d9e3e9; border-radius: 24px; }
+.install-card h1 { font-size: clamp(28px,4vw,42px); line-height: 1.2; margin: 24px 0 18px; }
+.install-card p { color: #456176; line-height: 1.65; margin: 18px 0; }
+.install-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; margin: 28px 0; }
+.install-grid section { border: 1px solid #d9e3e9; border-radius: 16px; padding: 24px; }
+.install-grid h2 { font-size: 21px; margin: 0 0 12px; }
+.install-grid ol { padding-left: 22px; line-height: 1.65; color: #456176; }
+.install-grid li + li { margin-top: 8px; }
+.install-action { margin: 24px 0; }
+.page-footer a { color: #456176; text-decoration: underline; }
+@media(max-width:600px) { .install-grid { grid-template-columns: 1fr; } .install-page { padding: 16px 12px; } }
+@media print { .connection-banner, .page-footer a { display: none; } }

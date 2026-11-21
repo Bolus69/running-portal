@@ -38,6 +38,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           </>
         )}
         <Link className="login-back" href="/">← Terug naar de app</Link>
+      <p className="login-help"><Link href="/installeren">Marathon Coach op je apparaat installeren</Link></p>
       </section>
       <p className="login-footer">Persoonlijke marathonbegeleiding · {new Date().getFullYear()}</p>
     </main>
