@@ -296,7 +296,29 @@ async function loadCoachData(supabase: Awaited<ReturnType<typeof import('@/lib/s
     const required = currentWeek?.workouts.filter((workout) => !workout.optional) ?? []
     const completed = required.filter((workout) => workout.status === 'completed')
     const latestActivity = activities[0]
-    const lastFeedback = latestActivity?.effort ? ({ easier: 'Makkelijker dan verwacht', as_expected: 'Zoals verwacht', harder: 'Zwaarder dan verwacht', not_good: 'Niet goed gegaan' } as const)[latestActivity.effort] : undefined
+    const feedbackLabels = { easier: 'Makkelijker dan verwacht', as_expected: 'Zoals verwacht', harder: 'Zwaarder dan verwacht', not_good: 'Niet goed gegaan' } as const
+    const feedbackEntries = [
+      ...activities.flatMap((activity) => activity.effort || activity.note?.trim() ? [{
+        date: activity.startedAt,
+        effort: activity.effort,
+        note: activity.note,
+        context: activity.distanceKm ? activity.distanceKm.toFixed(1).replace('.', ',') + ' km' : activity.durationMinutes + ' min',
+      }] : []),
+      ...(plan?.weeks.flatMap((week) => week.workouts.flatMap((workout) => workout.feedback ? [{
+        date: workout.feedback.completedAt ?? workout.date,
+        effort: workout.feedback.effort,
+        note: workout.feedback.note,
+        context: workout.title,
+      }] : [])) ?? []),
+    ].sort((a, b) => b.date.localeCompare(a.date))
+    const latestFeedback = feedbackEntries[0]
+    const lastFeedback = latestFeedback
+      ? latestFeedback.effort ? feedbackLabels[latestFeedback.effort] : 'Korte toelichting'
+      : undefined
+    const feedbackNote = latestFeedback?.note?.trim()
+    const lastFeedbackContext = latestFeedback
+      ? dateLabelForActivity({ startedAt: latestFeedback.date }) + ' · ' + (feedbackNote ? feedbackNote.slice(0, 65) + (feedbackNote.length > 65 ? '…' : '') : latestFeedback.context)
+      : undefined
     const lastLong = plan?.weeks.flatMap((week) => week.workouts).filter((workout) => workout.type === 'long' && workout.status === 'completed').sort((a, b) => b.date.localeCompare(a.date))[0]
     const overdue = required.filter((workout) => workout.date < todayDateISO() && workout.status === 'planned').length
     const risk: AthleteSummary['risk'] = overdue >= 2 ? 'red' : latestActivity?.effort === 'harder' || latestActivity?.effort === 'not_good' ? 'orange' : 'green'
@@ -320,7 +342,7 @@ async function loadCoachData(supabase: Awaited<ReturnType<typeof import('@/lib/s
       phase: currentWeek ? currentWeek.phase : 'Plan nog niet gestart',
       plannedThisWeek: required.length,
       completedThisWeek: completed.length,
-      lastActivity: latestActivity ? dateLabelForActivity(latestActivity) + ' · ' + (latestActivity.distanceKm ? latestActivity.distanceKm.toFixed(1).replace('.', ',') + ' km' : latestActivity.durationMinutes + ' min') : undefined,
+      lastActivity: lastFeedbackContext,
       lastFeedback,
       lastLongRun: lastLong ? dateLabelForActivity({ startedAt: lastLong.date }) + ' · ' + (lastLong.distanceKm ? lastLong.distanceKm + ' km' : lastLong.durationMinutes + ' min') : undefined,
       risk,

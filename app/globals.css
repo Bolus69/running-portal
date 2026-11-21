@@ -548,9 +548,9 @@ body { font-size: 15px; line-height: 1.6; }
 .plan-overview-hero .plan-baseline { color: #eff8d7; }
 .plan-overview-hero .plan-overview-icon { position: relative; z-index: 1; flex: 0 0 auto; color: var(--lime); background: rgba(213,243,107,.16); border: 1px solid rgba(213,243,107,.18); }
 @media (max-width: 620px) {
-  .coach-add-training .desktop-cta-label { display: none; }
-  .coach-add-training .mobile-cta-label { display: inline; max-width: none; }
-  .coach-add-training.button-compact span { max-width: none; overflow: visible; }
+  .coach-edit-plan .desktop-cta-label { display: none; }
+  .coach-edit-plan .mobile-cta-label { display: inline; max-width: none; }
+  .coach-edit-plan.button-compact span { max-width: none; overflow: visible; }
   .tab-photo-banner { height: 108px; margin: -5px 0 18px; border-radius: 12px; }
   .plan-row > .plan-row-main { min-width: 0; }
   .plan-overview.plan-overview-hero { min-height: 180px; padding: 19px 16px; background-position: 58% center; }
