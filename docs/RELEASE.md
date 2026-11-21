@@ -41,4 +41,4 @@ Supabase rapporteert dat controle op gelekte wachtwoorden uitstaat. Dit staat lo
 
 Vast adres is https://running-portal-beryl.vercel.app. De drie bestaande Supabase-variabelen zijn beschikbaar gemaakt voor production zonder sleutels opnieuw uit te lezen. APP_ORIGIN is per omgeving ingesteld. Uitnodiging en wachtwoordherstel gebruiken deze instelling en zijn losgemaakt van de oude Strava-configuratie. Bij ontbrekende databaseconfiguratie opent de app geen demo meer op de hoofdroute. De expliciete /demo blijft beschikbaar.
 
-De release gaat pas live na verificatie van de toegestane Supabase-inloglinks en de productiebuild. De echte apparaattests blijven nodig voor volledige acceptatie.
+De eigenaar heeft het vaste appadres bevestigd. Supabase Site URL is ingesteld op het vaste adres en de exacte /auth/accept-link is toegevoegd naast de bestaande Preview-link. De echte apparaattests blijven nodig voor volledige acceptatie. De bestaande App quality checks-workflow voert lint, types, tests en build uit.
