@@ -16,6 +16,20 @@ describe('marathon training plans', () => {
     expect(weeks[length - 1].workouts.some((workout) => workout.type === 'race' && workout.date === '2027-04-18')).toBe(true)
   })
 
+  it('keeps race week sessions before a weekday marathon and keeps the race date', () => {
+    const finalWeek = generatePlan({
+      marathonDate: '2027-04-15',
+      length: 16,
+      trainingDays: [2, 4, 0],
+      includeOptionalFourth: true,
+    }).at(-1)
+
+    expect(finalWeek?.workouts.map(({ date, type }) => ({ date, type }))).toEqual([
+      { date: '2027-04-13', type: 'easy' },
+      { date: '2027-04-15', type: 'race' },
+    ])
+  })
+
   it('keeps planned recovery weeks and avoids treating the extra session as mandatory', () => {
     const weeks = generatePlan({ marathonDate: '2027-04-18', length: 16 })
     expect(weeks[3].isRecoveryWeek).toBe(true)

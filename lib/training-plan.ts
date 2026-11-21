@@ -299,7 +299,7 @@ function longSession(week: number, length: PlanLength, phase: Phase, recovery: b
       description: 'Start beheerst. Pas tempo en voedingsplan aan op omstandigheden en hoe je je voelt.',
       steps: [
         { kind: 'warmup', label: 'Rustig voorbereiden (Z1)', durationMinutes: 10, intensity: 'E', all4runningZone: 1 },
-        { kind: 'work', label: 'Persoonlijk marathontempo', durationMinutes: 1, intensity: 'M', all4runningZone: 2 },
+        { kind: 'work', label: 'Persoonlijk marathontempo', intensity: 'M', all4runningZone: 2 },
       ],
       status: 'planned',
       optional: false,
@@ -322,7 +322,7 @@ function longSession(week: number, length: PlanLength, phase: Phase, recovery: b
       : 'Loop ontspannen in Z1. Je hoeft de afstand niet sneller af te leggen dan je herstel toelaat.',
     steps: [
       { kind: 'warmup', label: 'Inlopen (Z1)', durationMinutes: 10, intensity: 'E', all4runningZone: 1 },
-      { kind: 'easy', label: 'Rustige duur (Z1)', durationMinutes: 1, intensity: 'E', all4runningZone: 1 },
+      { kind: 'easy', label: 'Rustige duur (Z1)', intensity: 'E', all4runningZone: 1 },
       ...(marathonBlock
         ? [{ kind: 'work' as const, label: 'Marathonblok aan het einde', durationMinutes: 15, intensity: 'M' as const, all4runningZone: 2 as const }]
         : []),
@@ -391,7 +391,8 @@ export function generatePlan(input: PlanInput): PlanWeek[] {
       }
     }
 
-    sessions = sessions.filter((session) => session.date >= effectiveStartDate)
+    sessions = sessions.filter((session) => session.date >= effectiveStartDate
+      && (session.type === 'race' || session.date < input.marathonDate))
     weeks.push({ weekNumber: week, phase, goal: phaseGoal(phase, isRecoveryWeek), isRecoveryWeek, workouts: sessions })
   }
 

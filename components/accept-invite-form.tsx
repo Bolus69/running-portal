@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { createBrowserClient } from '@supabase/ssr'
 import { useEffect, useRef, useState } from 'react'
 
-type InviteState = 'checking' | 'confirm' | 'verifying' | 'ready' | 'invalid' | 'saved'
+type InviteState = 'checking' | 'confirm' | 'verifying' | 'ready' | 'saving' | 'invalid' | 'saved'
 type LinkFlow = 'invite' | 'recovery'
 
 export function AcceptInviteForm({ url, publishableKey }: { url: string; publishableKey: string }) {
@@ -44,7 +44,7 @@ export function AcceptInviteForm({ url, publishableKey }: { url: string; publish
           return { email: '', userId: '', flow, tokenHash, errorMessage: null }
         } else if (query.has('error') || query.has('error_code')) {
           authError = new Error(flow === 'recovery'
-            ? 'De herstel-link kan niet meer worden gebruikt.'
+            ? 'De herstellink kan niet meer worden gebruikt.'
             : 'De uitnodigingslink kan niet meer worden gebruikt.')
         } else if (accessToken && refreshToken) {
           const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
@@ -74,7 +74,7 @@ export function AcceptInviteForm({ url, publishableKey }: { url: string; publish
           flow,
           tokenHash: '',
           errorMessage: authError ? flow === 'recovery'
-            ? 'Deze herstel-link kan niet meer worden gebruikt. Hij kan verlopen zijn of al eerder zijn geopend. Vraag een nieuwe herstel-link aan.'
+            ? 'Deze herstellink kan niet meer worden gebruikt. Hij kan verlopen zijn of al eerder zijn geopend. Vraag een nieuwe herstellink aan.'
             : 'Deze uitnodigingslink is verlopen of al eerder gebruikt.' : null,
         }
       })()
@@ -88,7 +88,7 @@ export function AcceptInviteForm({ url, publishableKey }: { url: string; publish
       setErrorMessage(result.errorMessage ?? '')
       setState(result.errorMessage ? 'invalid' : result.tokenHash ? 'confirm' : 'ready')
     }).catch(() => {
-      setErrorMessage('De link kon niet worden gecontroleerd. Vraag een nieuwe herstel-link aan of vraag je coach om een nieuwe uitnodiging.')
+      setErrorMessage('De link kon niet worden gecontroleerd. Vraag een nieuwe herstellink aan of vraag je coach om een nieuwe uitnodiging.')
       setState('invalid')
     })
   }, [publishableKey, url])
@@ -105,7 +105,7 @@ export function AcceptInviteForm({ url, publishableKey }: { url: string; publish
       if (error) {
         setPendingTokenHash('')
         setErrorMessage(flow === 'recovery'
-          ? 'De herstel-link is verlopen of al gebruikt. Vraag een nieuwe herstel-link aan.'
+          ? 'De herstellink is verlopen of al gebruikt. Vraag een nieuwe herstellink aan.'
           : 'Deze uitnodigingslink is verlopen of al eerder gebruikt.')
         setState('invalid')
         return
@@ -114,7 +114,7 @@ export function AcceptInviteForm({ url, publishableKey }: { url: string; publish
       if (userError || !data.user) {
         setPendingTokenHash('')
         setErrorMessage(flow === 'recovery'
-          ? 'De herstelsessie kon niet worden gestart. Vraag een nieuwe herstel-link aan.'
+          ? 'De herstelsessie kon niet worden gestart. Vraag een nieuwe herstellink aan.'
           : 'De uitnodiging kon niet worden gecontroleerd.')
         setState('invalid')
         return
@@ -126,7 +126,7 @@ export function AcceptInviteForm({ url, publishableKey }: { url: string; publish
     } catch {
       setPendingTokenHash('')
       setErrorMessage(flow === 'recovery'
-        ? 'De herstel-link kon niet worden gecontroleerd. Vraag een nieuwe herstel-link aan.'
+        ? 'De herstellink kon niet worden gecontroleerd. Vraag een nieuwe herstellink aan.'
         : 'De uitnodigingslink kon niet worden gecontroleerd.')
       setState('invalid')
     }
@@ -136,36 +136,42 @@ export function AcceptInviteForm({ url, publishableKey }: { url: string; publish
     event.preventDefault()
     if (password.length < 6) return setErrorMessage('Kies een wachtwoord van minimaal 6 tekens.')
     if (password !== confirmation) return setErrorMessage('De wachtwoorden komen niet overeen.')
-    const supabase = createBrowserClient(url, publishableKey, {
-      auth: { detectSessionInUrl: false },
-    })
-    const { data: currentUser, error: sessionError } = await supabase.auth.getUser()
-    if (sessionError || !currentUser.user || currentUser.user.id !== inviteUserId) {
-      setErrorMessage(flow === 'recovery'
-        ? 'De herstelsessie is verlopen. Vraag een nieuwe herstel-link aan.'
-        : 'De uitnodigingssessie is verlopen.')
-      setState('invalid')
+    if (state !== 'ready') return
+    setState('saving')
+    setErrorMessage('')
+    try {
+      const supabase = createBrowserClient(url, publishableKey, {
+        auth: { detectSessionInUrl: false },
+      })
+      const { data: currentUser, error: sessionError } = await supabase.auth.getUser()
+      if (sessionError || !currentUser.user || currentUser.user.id !== inviteUserId) {
+        setErrorMessage(flow === 'recovery'
+          ? 'De herstelsessie is verlopen. Vraag een nieuwe herstellink aan.'
+          : 'De uitnodigingssessie is verlopen.')
+        setState('invalid')
+        return
+      }
+      const { error } = await supabase.auth.updateUser({ password })
+      if (error) throw error
+    } catch {
+      setErrorMessage('Het wachtwoord kon niet worden opgeslagen. Probeer het opnieuw.')
+      setState('ready')
       return
     }
-    const { error } = await supabase.auth.updateUser({ password })
-    if (error) return setErrorMessage('Het wachtwoord kon niet worden opgeslagen. Probeer het opnieuw.')
     setState('saved')
-    setErrorMessage('')
-    if (flow === 'recovery') return
-    // A full page load clears any cached dashboard for another account in the
-    // same browser and loads the newly activated athlete's own profile.
-    window.location.replace('/')
+    // Reload the dashboard for the newly activated athlete.
+    if (flow === 'invite') window.location.replace('/')
   }
 
   if (state === 'checking') return <p className="login-help" role="status">Link controleren…</p>
-  if (state === 'confirm' || state === 'verifying') return <div className="login-form"><p className="login-help">{flow === 'recovery' ? 'Klik hieronder om je herstel-link te controleren en een nieuw wachtwoord te kiezen.' : 'Klik hieronder om je uitnodiging te controleren en je wachtwoord in te stellen.'}</p><button className="button button-primary full-width" type="button" onClick={() => void confirmLink()} disabled={state === 'verifying'}>{state === 'verifying' ? 'Link controleren…' : flow === 'recovery' ? 'Herstel-link gebruiken' : 'Uitnodiging accepteren'}</button></div>
+  if (state === 'confirm' || state === 'verifying') return <div className="login-form"><p className="login-help">{flow === 'recovery' ? 'Klik hieronder om je herstellink te controleren en een nieuw wachtwoord te kiezen.' : 'Klik hieronder om je uitnodiging te controleren en je wachtwoord in te stellen.'}</p><button className="button button-primary full-width" type="button" onClick={() => void confirmLink()} disabled={state === 'verifying'}>{state === 'verifying' ? 'Link controleren…' : flow === 'recovery' ? 'Herstel-link gebruiken' : 'Uitnodiging accepteren'}</button></div>
   if (state === 'invalid') return <div className="invite-invalid">
-    <p className="login-error" role="alert">{errorMessage || (flow === 'recovery' ? 'Deze herstel-link kan niet meer worden gebruikt.' : 'Deze uitnodigingslink is verlopen of al eerder gebruikt.')}</p>
+    <p className="login-error" role="alert">{errorMessage || (flow === 'recovery' ? 'Deze herstellink kan niet meer worden gebruikt.' : 'Deze uitnodigingslink is verlopen of al eerder gebruikt.')}</p>
     {flow === 'recovery' ? <>
-      <p className="login-help">Vraag een nieuwe herstel-link aan en open die in dezelfde browser.</p>
-      <Link className="button button-outline full-width" href="/forgot-password">Nieuwe herstel-link aanvragen</Link>
+      <p className="login-help">Vraag een nieuwe herstellink aan en open die in dezelfde browser.</p>
+      <Link className="button button-outline full-width" href="/forgot-password">Nieuwe herstellink aanvragen</Link>
     </> : <>
-      <p className="login-help">Heb je al een account aangemaakt? Vraag hieronder direct een herstel-link aan om een nieuw wachtwoord in te stellen. Heb je nog geen account, vraag je coach dan om een nieuwe uitnodiging.</p>
+      <p className="login-help">Heb je al een wachtwoord? Ga naar inloggen. Is je account al geactiveerd en moet je je wachtwoord nog instellen of wijzigen? Vraag een herstellink aan. Vraag je coach om een nieuwe uitnodiging als je account nog niet actief is.</p>
       <Link className="button button-primary full-width" href="/forgot-password">Nieuw wachtwoord aanvragen</Link>
       <Link className="button button-outline full-width" href="/login">Naar inloggen</Link>
     </>}
@@ -176,10 +182,10 @@ export function AcceptInviteForm({ url, publishableKey }: { url: string; publish
 
   return <form className="login-form" onSubmit={setNewPassword}>
     {email && <p className="invite-email">Account voor <strong>{email}</strong></p>}
-    <label className="field"><span>Nieuw wachtwoord</span><input required type="password" minLength={6} autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
-    <label className="field"><span>Herhaal wachtwoord</span><input required type="password" minLength={6} autoComplete="new-password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} /></label>
+    <label className="field"><span>Nieuw wachtwoord</span><input required type="password" minLength={6} autoComplete="new-password" disabled={state === 'saving'} value={password} onChange={(event) => setPassword(event.target.value)} /></label>
+    <label className="field"><span>Herhaal wachtwoord</span><input required type="password" minLength={6} autoComplete="new-password" disabled={state === 'saving'} value={confirmation} onChange={(event) => setConfirmation(event.target.value)} /></label>
     {errorMessage && <p className="login-error" role="alert">{errorMessage}</p>}
-    <button className="button button-primary full-width">{flow === 'recovery' ? 'Wachtwoord wijzigen' : 'Wachtwoord instellen'}</button>
+    <button className="button button-primary full-width" disabled={state === 'saving'}>{state === 'saving' ? 'Opslaan…' : flow === 'recovery' ? 'Wachtwoord wijzigen' : 'Wachtwoord instellen'}</button>
     <p className="login-help">Gebruik minimaal 6 tekens.</p>
   </form>
 }

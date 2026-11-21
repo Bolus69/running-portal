@@ -192,7 +192,7 @@ async function loadPlan(supabase: Awaited<ReturnType<typeof import('@/lib/supaba
         ? String(checkin?.effort) as NonNullable<PlanWeek['workouts'][number]['feedback']>['effort']
         : undefined
       const feedbackNote = typeof checkin?.note === 'string' ? checkin.note : undefined
-      const feedback = checkinState === 'completed' && (feedbackEffort || feedbackNote)
+      const feedback = checkinState === 'completed'
         ? { effort: feedbackEffort, note: feedbackNote || undefined, completedAt: typeof checkin?.completed_at === 'string' ? checkin.completed_at : undefined }
         : undefined
       return {
@@ -309,19 +309,22 @@ async function loadCoachData(supabase: Awaited<ReturnType<typeof import('@/lib/s
     const completed = required.filter((workout) => workout.status === 'completed')
     const latestActivity = activities[0]
     const feedbackLabels = { easier: 'Makkelijker dan verwacht', as_expected: 'Zoals verwacht', harder: 'Zwaarder dan verwacht', not_good: 'Niet goed gegaan' } as const
+    const planWorkouts = plan?.weeks.flatMap((week) => week.workouts) ?? []
+    const checkedWorkouts = new Set(planWorkouts.filter((workout) => workout.feedback).map((workout) => workout.id))
     const feedbackEntries = [
-      ...activities.flatMap((activity) => activity.effort || activity.note?.trim() ? [{
+      ...activities.filter((activity) => !activity.plannedWorkoutId || !checkedWorkouts.has(activity.plannedWorkoutId))
+        .flatMap((activity) => activity.effort || activity.note?.trim() ? [{
         date: activity.startedAt,
         effort: activity.effort,
         note: activity.note,
         context: activity.distanceKm ? activity.distanceKm.toFixed(1).replace('.', ',') + ' km' : activity.durationMinutes + ' min',
       }] : []),
-      ...(plan?.weeks.flatMap((week) => week.workouts.flatMap((workout) => workout.feedback ? [{
+      ...planWorkouts.flatMap((workout) => workout.feedback?.effort || workout.feedback?.note?.trim() ? [{
         date: workout.feedback.completedAt ?? workout.date,
         effort: workout.feedback.effort,
         note: workout.feedback.note,
         context: workout.title,
-      }] : [])) ?? []),
+      }] : []),
     ].sort((a, b) => b.date.localeCompare(a.date))
     const latestFeedback = feedbackEntries[0]
     const lastFeedback = latestFeedback
@@ -333,7 +336,7 @@ async function loadCoachData(supabase: Awaited<ReturnType<typeof import('@/lib/s
       : undefined
     const lastLong = plan?.weeks.flatMap((week) => week.workouts).filter((workout) => workout.type === 'long' && workout.status === 'completed').sort((a, b) => b.date.localeCompare(a.date))[0]
     const overdue = required.filter((workout) => workout.date < todayDateISO() && workout.status === 'planned').length
-    const risk: AthleteSummary['risk'] = overdue >= 2 ? 'red' : latestActivity?.effort === 'harder' || latestActivity?.effort === 'not_good' ? 'orange' : 'green'
+    const risk: AthleteSummary['risk'] = overdue >= 2 ? 'red' : latestFeedback?.effort === 'harder' || latestFeedback?.effort === 'not_good' ? 'orange' : 'green'
     const marathonDate = plan?.marathonDate ?? ''
     return {
       id: athleteId,
@@ -359,7 +362,7 @@ async function loadCoachData(supabase: Awaited<ReturnType<typeof import('@/lib/s
       lastFeedback,
       lastLongRun: lastLong ? dateLabelForActivity({ startedAt: lastLong.date }) + ' · ' + (lastLong.distanceKm ? lastLong.distanceKm + ' km' : lastLong.durationMinutes + ' min') : undefined,
       risk,
-      reason: overdue >= 2 ? 'Meerdere trainingen staan na de geplande datum nog open.' : latestActivity?.effort === 'harder' || latestActivity?.effort === 'not_good' ? 'De laatste training voelde zwaarder dan verwacht.' : undefined,
+      reason: overdue >= 2 ? 'Meerdere trainingen staan na de geplande datum nog open.' : latestFeedback?.effort === 'harder' || latestFeedback?.effort === 'not_good' ? 'De laatste training voelde zwaarder dan verwacht.' : undefined,
       activities,
       wellness: wellness.filter((entry) => entry.visibleToCoach),
       coachNotes: notesByAthlete.get(athleteId) ?? [],

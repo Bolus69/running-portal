@@ -21,9 +21,9 @@ Maak hiervoor geen nieuw project aan. Wijzigingen op deze branch leveren een pre
 - Coach kan een atleet uitnodigen en vanuit het atleetprofiel een schema instellen of bijwerken.
 - Trainingen handmatig registreren en korte feedback geven.
 - Optionele herstelgegevens, met keuze om ze wel of niet met de coach te delen.
-- Strava OAuth-import, activiteitmatching en laps/blokken als Strava ze aanlevert.
+- Handmatige FIT-upload met trainingsgegevens en eventuele laps/blokken.
 - Coachvoorstellen veranderen een schema pas na beoordeling door de coach.
-- Row Level Security op de Supabase-tabellen; Strava-tokens blijven versleuteld aan de serverkant.
+- Row Level Security op de Supabase-tabellen.
 
 ## Eerste coachaccount klaarzetten
 
@@ -65,13 +65,10 @@ Atleten krijgen na de uitnodiging een eigen account en zien alleen hun eigen geg
 
 De bestaande `marathon-coach`-database bevat de app-tabellen en beveiligingsregels. De migratie `20261107193444_security_and_import_indexes.sql` is toegepast op dit project. Voer oude migraties niet opnieuw uit. Nieuwe databasewijzigingen komen als nieuwe migratiebestanden in `supabase/migrations`.
 
-## Strava
+## Trainingsbestanden
 
-De Strava-koppeling is voorbereid voor een test met je eigen account. De veilige encryptie- en webhook-sleutels staan al als versleutelde omgevingsvariabelen op alleen de Vercel-previewbranch. Voeg zelf alleen `STRAVA_CLIENT_ID` en `STRAVA_CLIENT_SECRET` toe via **Vercel → running-portal → Settings → Environment Variables**, met omgeving **Preview** en branch `feat/marathon-coach-mvp`.
+Upload een FIT-bestand bij het afronden van een training. Zie de [handleiding voor FIT-upload](docs/fit-upload.md).
 
-Volg daarna de leekvriendelijke handleiding [Strava instellen en testen](docs/strava-preview.md). De eerste koppeling haalt de laatste 30 dagen op; je kunt daarna ook handmatig synchroniseren. De app toont intervalblokken alleen wanneer Strava ze echt terugstuurt.
-
-Vercel-preview is beschermd. Als de eerste import lukt maar automatische webhook-synchronisatie niet, kan Strava de beschermde previewcallback niet bereiken. De previewbeveiliging en productie zijn bewust niet aangepast.
 ## Lokaal starten
 
 Vereist Node.js 20.9 of hoger.
