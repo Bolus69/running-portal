@@ -395,6 +395,11 @@ body { font-size: 15px; line-height: 1.6; }
 .zone-reference summary small { color: var(--muted); font-size: 11px; }
 .zone-reference summary > svg { color: #738294; transition: transform .16s ease; }
 .zone-reference[open] summary > svg { transform: rotate(180deg); }
+.talk-test-reference[open] { border-color: #e9eee2; background: #f1f4eb; }
+.talk-test-summary { display: flex !important; align-items: center; gap: 11px; }
+.talk-test-summary > span:last-child { display: grid; gap: 3px; }
+.talk-test-content { margin-top: 12px; }
+.talk-test-content > p { margin: 0; color: var(--ink-soft); font-size: 11px; line-height: 1.55; }
 .zone-reference-list { display: grid; gap: 6px; margin-top: 14px; }
 .zone-reference-list > div { display: grid; grid-template-columns: 35px minmax(0,1fr); gap: 9px; align-items: center; padding: 7px 8px; border-radius: 8px; background: #F5F8FA; }
 .zone-reference-list > div > b { display: grid; place-items: center; min-height: 28px; border-radius: 7px; background: #EFF8D7; color: #34502B; font-family: 'Manrope', sans-serif; font-size: 11px; }
@@ -597,7 +602,7 @@ body { font-size: 15px; line-height: 1.6; }
 
 /* Coach overview and athlete profile tabs */
 .coach-view { display: grid; gap: 18px; }
-.coach-overview-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.coach-overview-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .coach-athletes-panel { padding: 20px 22px; }
 .profile-main-column { display: grid; gap: 14px; min-width: 0; }
 .athlete-profile-stack { display: grid; gap: 14px; width: min(900px, 100%); }
@@ -616,7 +621,7 @@ body { font-size: 15px; line-height: 1.6; }
 .athlete-identity-grid small { color: var(--muted); font-size: 9px; }
 .athlete-identity-grid strong { overflow-wrap: anywhere; font-size: 11px; }
 @media (max-width: 900px) {
-  .coach-overview-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .coach-overview-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 620px) {
   .coach-overview-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
