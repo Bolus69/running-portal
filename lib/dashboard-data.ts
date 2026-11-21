@@ -1,0 +1,443 @@
+import 'server-only'
+import { createAdminSupabaseClient } from '@/lib/supabase/admin'
+import { formatPace, currentWeekNumber } from '@/lib/training-plan'
+import { todayDateISO } from '@/lib/dates'
+import type { PlanWeek } from '@/lib/training-plan'
+import type { AppRole, AthleteSummary, DashboardData, RunActivity, WellnessEntry } from '@/lib/types'
+
+type Row = Record<string, unknown>
+
+function numberValue(value: unknown): number | undefined {
+  const number = Number(value)
+  return Number.isFinite(number) && value !== null && value !== undefined ? number : undefined
+}
+
+function athleteProfileAge(value: unknown): number | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const athleteProfile = (value as Row).athleteProfile
+  if (!athleteProfile || typeof athleteProfile !== 'object' || Array.isArray(athleteProfile)) return undefined
+  const age = Number((athleteProfile as Row).age)
+  return Number.isInteger(age) && age >= 1 && age <= 120 ? age : undefined
+}
+
+function athleteProfileContactEmail(value: unknown): string | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const athleteProfile = (value as Row).athleteProfile
+  if (!athleteProfile || typeof athleteProfile !== 'object' || Array.isArray(athleteProfile)) return undefined
+  const email = (athleteProfile as Row).contactEmail
+  return typeof email === 'string' && email.trim() ? email.trim() : undefined
+}
+
+function timeLabel(secondsValue: unknown): string {
+  const seconds = Math.round(numberValue(secondsValue) ?? 0)
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  const remainder = seconds % 60
+  return [hours, minutes, remainder].map((part) => String(part).padStart(2, '0')).join(':')
+}
+
+function weekdayLabel(value: string): string {
+  return new Intl.DateTimeFormat('nl-NL', { weekday: 'short' }).format(new Date(value + 'T12:00:00'))
+}
+
+function effortName(value: unknown): RunActivity['effort'] {
+  if (value === 'easier' || value === 'harder' || value === 'not_good' || value === 'as_expected') return value
+  return undefined
+}
+
+function mapWellness(row: Row): WellnessEntry {
+  return {
+    id: String(row.id),
+    date: String(row.entry_date),
+    sleepHours: numberValue(row.sleep_hours),
+    restingHeartRate: numberValue(row.resting_heart_rate),
+    recoveryScore: numberValue(row.recovery_score),
+    note: typeof row.note === 'string' ? row.note : undefined,
+    visibleToCoach: Boolean(row.visible_to_coach),
+  }
+}
+
+function mapActivities(activityRows: Row[], lapRows: Row[], linkRows: Row[]): RunActivity[] {
+  const lapsByActivity = new Map<string, Row[]>()
+  for (const lap of lapRows) {
+    const activityId = String(lap.activity_id)
+    lapsByActivity.set(activityId, [...(lapsByActivity.get(activityId) ?? []), lap])
+  }
+  const linkByActivity = new Map(linkRows.map((link) => [String(link.activity_id), String(link.planned_workout_id)]))
+  return activityRows.map((row) => {
+    const id = String(row.id)
+    const raw = (row.raw_summary && typeof row.raw_summary === 'object' ? row.raw_summary : {}) as Row
+    const speed = numberValue(row.average_speed_mps)
+    const distance = numberValue(row.distance_meters)
+    const duration = numberValue(row.elapsed_seconds)
+    const laps = (lapsByActivity.get(id) ?? []).sort((a, b) => Number(a.lap_order) - Number(b.lap_order))
+    return {
+      id,
+      name: String(row.name ?? 'Hardlooptraining'),
+      startedAt: String(row.started_at),
+      activityType: String(row.activity_type ?? 'Run'),
+      durationMinutes: Math.round((duration ?? numberValue(row.moving_seconds) ?? 0) / 60),
+      distanceKm: distance !== undefined ? Math.round((distance / 1000) * 100) / 100 : undefined,
+      pace: speed && speed > 0 ? formatPace(1000 / speed) : undefined,
+      averageHeartRate: numberValue(row.average_heart_rate),
+      source: row.source === 'strava' ? 'strava' as const : raw.import_source === 'fit' ? 'upload' as const : 'manual' as const,
+      plannedWorkoutId: linkByActivity.get(id),
+      note: typeof raw.note === 'string' ? raw.note : undefined,
+      effort: effortName(raw.effort),
+      laps: laps.length ? laps.map((lap, index) => {
+        const lapSpeed = numberValue(lap.average_speed_mps)
+        const lapDistance = numberValue(lap.distance_meters)
+        return {
+          id: String(lap.id),
+          label: String(lap.label || 'Lap ' + (index + 1)),
+          durationMinutes: numberValue(lap.elapsed_seconds) ? Number(lap.elapsed_seconds) / 60 : undefined,
+          distanceKm: lapDistance !== undefined ? Math.round((lapDistance / 1000) * 100) / 100 : undefined,
+          pace: lapSpeed && lapSpeed > 0 ? formatPace(1000 / lapSpeed) : undefined,
+          averageHeartRate: numberValue(lap.average_heart_rate),
+        }
+      }) : undefined,
+    }
+  }).sort((a, b) => b.startedAt.localeCompare(a.startedAt))
+}
+
+async function loadActivities(supabase: Awaited<ReturnType<typeof import('@/lib/supabase/server').createServerSupabaseClient>>, athleteId: string) {
+  const since = new Date(Date.now() - 30 * 86400000).toISOString()
+  const { data: activityData } = await supabase.from('activities').select('*').eq('athlete_id', athleteId).gte('started_at', since).order('started_at', { ascending: false }).limit(100)
+  const activities = (activityData ?? []) as unknown as Row[]
+  const ids = activities.map((row) => String(row.id))
+  if (!ids.length) return [] as RunActivity[]
+  const [{ data: lapData }, { data: linkData }] = await Promise.all([
+    supabase.from('activity_laps').select('*').in('activity_id', ids),
+    supabase.from('activity_workout_links').select('activity_id,planned_workout_id').in('activity_id', ids),
+  ])
+  return mapActivities(activities, (lapData ?? []) as unknown as Row[], (linkData ?? []) as unknown as Row[])
+}
+
+async function loadPlan(supabase: Awaited<ReturnType<typeof import('@/lib/supabase/server').createServerSupabaseClient>>, athleteId: string) {
+  const { data: planData } = await supabase.from('training_plans').select('*').eq('athlete_id', athleteId).order('created_at', { ascending: true })
+  const planRows = ((planData ?? []) as unknown as Row[])
+  let activePlanIndex = -1
+  for (let index = 0; index < planRows.length; index += 1) {
+    if (planRows[index].status === 'active') activePlanIndex = index
+  }
+  if (activePlanIndex < 0) return null
+
+  const plan = planRows[activePlanIndex]
+  const planId = String(plan.id)
+  const effectiveStartDate = typeof plan.effective_start_date === 'string' ? plan.effective_start_date : undefined
+  const timelinePlans = effectiveStartDate
+    ? planRows.slice(0, activePlanIndex + 1).filter((item) => item.status === 'active' || item.status === 'paused')
+    : [plan]
+  const planIds = timelinePlans.map((item) => String(item.id))
+  const boundsByPlan = new Map<string, { from?: string; until?: string }>()
+  timelinePlans.forEach((item, index) => {
+    const id = String(item.id)
+    const nextPlan = timelinePlans[index + 1]
+    const from = item.id === plan.id && effectiveStartDate
+      ? effectiveStartDate
+      : typeof item.effective_start_date === 'string' ? item.effective_start_date : undefined
+    const until = nextPlan && typeof nextPlan.effective_start_date === 'string'
+      ? nextPlan.effective_start_date
+      : nextPlan && index + 1 === timelinePlans.length - 1 ? effectiveStartDate : undefined
+    boundsByPlan.set(id, { from, until })
+  })
+
+  const [{ data: weekData }, { data: workoutData }] = await Promise.all([
+    supabase.from('plan_weeks').select('*').in('plan_id', planIds).order('week_number'),
+    supabase.from('planned_workouts').select('*').in('plan_id', planIds).order('workout_date'),
+  ])
+  const weeks = (weekData ?? []) as unknown as Row[]
+  const allWorkouts = (workoutData ?? []) as unknown as Row[]
+  const workouts = allWorkouts.filter((workout) => {
+    const bounds = boundsByPlan.get(String(workout.plan_id))
+    if (!bounds) return false
+    const workoutDate = String(workout.workout_date)
+    if (bounds.from && workoutDate < bounds.from) return false
+    if (bounds.until && workoutDate >= bounds.until) return false
+    return true
+  })
+  const workoutIds = workouts.map((item) => String(item.id))
+  const [{ data: stepData }, { data: feedbackData }] = workoutIds.length ? await Promise.all([
+    supabase.from('workout_steps').select('*').in('planned_workout_id', workoutIds).order('step_order'),
+    supabase.from('workout_feedback').select('planned_workout_id,state,effort,note,completed_at').eq('athlete_id', athleteId).in('planned_workout_id', workoutIds),
+  ]) : [{ data: [] }, { data: [] }]
+  const steps = ((stepData ?? []) as unknown as Row[])
+  const feedback = ((feedbackData ?? []) as unknown as Row[])
+  const stepsByWorkout = new Map<string, Row[]>()
+  for (const step of steps) {
+    const workoutId = String(step.planned_workout_id)
+    stepsByWorkout.set(workoutId, [...(stepsByWorkout.get(workoutId) ?? []), step])
+  }
+  const feedbackByWorkout = new Map(feedback.map((entry) => [String(entry.planned_workout_id), entry]))
+  const workoutsByWeek = new Map<string, Row[]>()
+  for (const workout of workouts) {
+    const weekId = String(workout.plan_week_id)
+    workoutsByWeek.set(weekId, [...(workoutsByWeek.get(weekId) ?? []), workout])
+  }
+  const planWeeks: PlanWeek[] = weeks.flatMap((week) => {
+    const weekId = String(week.id)
+    const weekWorkouts = (workoutsByWeek.get(weekId) ?? []).sort((a, b) => Number(a.workout_order) - Number(b.workout_order)).map((workout) => {
+      const workoutId = String(workout.id)
+      const checkin = feedbackByWorkout.get(workoutId)
+      const workoutSteps = (stepsByWorkout.get(workoutId) ?? []).map((step) => ({
+        kind: String(step.step_type) as PlanWeek['workouts'][number]['steps'][number]['kind'],
+        label: String(step.label),
+        durationMinutes: Number(step.duration_minutes) === 1 && (step.label === 'Persoonlijk marathontempo' || step.label === 'Rustige duur (Z1)')
+          ? undefined : numberValue(step.duration_minutes),
+        durationSeconds: numberValue(step.duration_seconds) ?? (step.step_type === 'strides' && step.label === 'Korte versnellingen' ? 15 : undefined),
+        all4runningZone: step.all4running_zone ? (String(step.all4running_zone) === '4-5' ? '4-5' as const : Number(step.all4running_zone) as 1 | 2 | 3 | 4 | 5) : undefined,
+        repeats: numberValue(step.repeats),
+        intensity: typeof step.intensity === 'string' ? step.intensity as 'E' | 'M' | 'T' | 'I' | 'R' : undefined,
+      }))
+      const checkinState = checkin?.state
+      const state: PlanWeek['workouts'][number]['status'] = checkinState === 'completed' || workout.state === 'completed' ? 'completed' : checkinState === 'skipped' ? 'skipped' : workout.state === 'adjusted' ? 'adjusted' : workout.state === 'skipped' ? 'skipped' : 'planned'
+      const feedbackEffort = ['easier', 'as_expected', 'harder', 'not_good'].includes(String(checkin?.effort))
+        ? String(checkin?.effort) as NonNullable<PlanWeek['workouts'][number]['feedback']>['effort']
+        : undefined
+      const feedbackNote = typeof checkin?.note === 'string' ? checkin.note : undefined
+      const feedback = checkinState === 'completed'
+        ? { effort: feedbackEffort, note: feedbackNote || undefined, completedAt: typeof checkin?.completed_at === 'string' ? checkin.completed_at : undefined }
+        : undefined
+      return {
+        id: workoutId,
+        date: String(workout.workout_date),
+        day: weekdayLabel(String(workout.workout_date)),
+        title: String(workout.title),
+        type: String(workout.workout_type) as PlanWeek['workouts'][number]['type'],
+        durationMinutes: numberValue(workout.duration_minutes),
+        distanceKm: numberValue(workout.distance_km),
+        timeCapMinutes: numberValue(workout.time_cap_minutes),
+        intensity: String(workout.intensity ?? ''),
+        goal: String(workout.goal ?? ''),
+        description: String(workout.description ?? ''),
+        steps: workoutSteps,
+        status: state,
+        optional: Boolean(workout.is_optional),
+        feedback,
+      }
+    }).filter((workout) => workout.type === 'race'
+      || workout.date < String(plan.marathon_date)
+      || workout.status === 'completed'
+      || workout.status === 'skipped')
+    if (!weekWorkouts.length) return []
+    return [{
+      id: weekId,
+      historical: String(week.plan_id) !== planId,
+      weekNumber: Number(week.week_number),
+      phase: String(week.phase) as PlanWeek['phase'],
+      goal: String(week.goal ?? ''),
+      isRecoveryWeek: Boolean(week.is_recovery_week),
+      workouts: weekWorkouts,
+    }]
+  }).sort((a, b) => (a.workouts[0]?.date ?? '').localeCompare(b.workouts[0]?.date ?? ''))
+
+  const length = Number(plan.plan_length) as 12 | 16 | 20
+  const todayDate = todayDateISO()
+  const today = new Date(todayDate + 'T12:00:00.000Z')
+  const todayWeekStart = new Date(today)
+  const weekday = todayWeekStart.getUTCDay()
+  todayWeekStart.setUTCDate(todayWeekStart.getUTCDate() - (weekday === 0 ? 6 : weekday - 1))
+  const todayWeekStartISO = todayWeekStart.toISOString().slice(0, 10)
+  const todayWeekEnd = new Date(todayWeekStart)
+  todayWeekEnd.setUTCDate(todayWeekEnd.getUTCDate() + 6)
+  const todayWeekEndISO = todayWeekEnd.toISOString().slice(0, 10)
+  const currentPlanWeek = planWeeks.find((week) => week.workouts.some((workout) => workout.date >= todayWeekStartISO && workout.date <= todayWeekEndISO))
+    ?? planWeeks.find((week) => (week.workouts[0]?.date ?? '') >= todayDate)
+    ?? planWeeks[0]
+  const activeWorkouts = workouts.filter((workout) => String(workout.plan_id) === planId)
+  const optionalWorkout = activeWorkouts.find((workout) => Boolean(workout.is_optional))
+  const optionalTrainingDay = optionalWorkout ? new Date(String(optionalWorkout.workout_date) + 'T12:00:00.000Z').getUTCDay() : 6
+  return {
+    length,
+    marathonDate: String(plan.marathon_date),
+    goalTime: timeLabel(plan.goal_time_seconds),
+    currentWeek: currentPlanWeek?.weekNumber ?? currentWeekNumber(planWeeks, today),
+    currentWeekId: currentPlanWeek?.id,
+    weeks: planWeeks,
+    trainingDays: Array.isArray(plan.training_days) ? plan.training_days.map(Number) : [2, 4, 0],
+    includeOptionalFourth: Boolean(plan.has_optional_fourth),
+    optionalTrainingDay,
+    recentRaceDistanceKm: plan.recent_race_distance_km === null || plan.recent_race_distance_km === undefined ? undefined : Number(plan.recent_race_distance_km),
+    recentRaceTimeSeconds: plan.recent_race_time_seconds === null || plan.recent_race_time_seconds === undefined ? undefined : Number(plan.recent_race_time_seconds),
+    recentWeeklyKm: plan.recent_weekly_km === null || plan.recent_weekly_km === undefined ? undefined : Number(plan.recent_weekly_km),
+    recentLongestRunKm: plan.recent_longest_run_km === null || plan.recent_longest_run_km === undefined ? undefined : Number(plan.recent_longest_run_km),
+  }
+}
+
+async function loadWellness(supabase: Awaited<ReturnType<typeof import('@/lib/supabase/server').createServerSupabaseClient>>, athleteId: string): Promise<WellnessEntry[]> {
+  const { data } = await supabase.from('wellness_entries').select('*').eq('athlete_id', athleteId).order('entry_date', { ascending: false }).limit(10)
+  return ((data ?? []) as unknown as Row[]).map(mapWellness)
+}
+
+async function loadCoachData(supabase: Awaited<ReturnType<typeof import('@/lib/supabase/server').createServerSupabaseClient>>, userId: string, fullName: string): Promise<DashboardData> {
+  const { data: relationshipData } = await supabase.from('coach_athletes').select('athlete_id').eq('coach_id', userId).eq('status', 'active').limit(50)
+  const athleteIds = [...new Set(((relationshipData ?? []) as unknown as Row[]).map((item) => String(item.athlete_id)))]
+  const admin = createAdminSupabaseClient()
+  const emailByAthleteId = new Map<string, string>()
+  for (let offset = 0; offset < athleteIds.length; offset += 10) {
+    const batch = athleteIds.slice(offset, offset + 10)
+    const emailResults = await Promise.all(batch.map(async (athleteId) => {
+      try {
+        const { data, error } = await admin.auth.admin.getUserById(athleteId)
+        return { athleteId, email: error ? undefined : data.user?.email }
+      } catch {
+        return { athleteId, email: undefined }
+      }
+    }))
+    for (const result of emailResults) {
+      if (result.email) emailByAthleteId.set(result.athleteId, result.email)
+    }
+  }
+  const [profileResult, suggestionResult, noteResult] = await Promise.all([
+    athleteIds.length ? supabase.from('profiles').select('id,full_name,preferences').in('id', athleteIds) : Promise.resolve({ data: [] }),
+    supabase.from('coach_suggestions').select('*').eq('coach_id', userId).order('created_at', { ascending: false }).limit(50),
+    athleteIds.length ? supabase.from('coach_notes').select('id,athlete_id,note,created_at').eq('coach_id', userId).in('athlete_id', athleteIds).order('created_at', { ascending: false }).limit(100) : Promise.resolve({ data: [] }),
+  ])
+  const profiles = ((profileResult.data ?? []) as unknown as Row[])
+  const nameById = new Map(profiles.map((profile) => [String(profile.id), String(profile.full_name || 'Atleet')]))
+  const ageById = new Map(profiles.flatMap((profile) => {
+    const age = athleteProfileAge(profile.preferences)
+    return age === undefined ? [] : [[String(profile.id), age] as const]
+  }))
+  const contactEmailById = new Map(profiles.flatMap((profile) => {
+    const email = athleteProfileContactEmail(profile.preferences)
+    return email ? [[String(profile.id), email] as const] : []
+  }))
+  const notesByAthlete = new Map<string, { id: string; note: string; createdAt: string }[]>()
+  for (const row of (noteResult.data ?? []) as unknown as Row[]) {
+    const athleteId = String(row.athlete_id)
+    notesByAthlete.set(athleteId, [...(notesByAthlete.get(athleteId) ?? []), { id: String(row.id), note: String(row.note), createdAt: String(row.created_at) }])
+  }
+  const athleteData = await Promise.all(athleteIds.map(async (athleteId): Promise<AthleteSummary> => {
+    const [plan, activities, wellness] = await Promise.all([loadPlan(supabase, athleteId), loadActivities(supabase, athleteId), loadWellness(supabase, athleteId)])
+    const currentWeek = plan?.weeks.find((week) => week.id === plan.currentWeekId) ?? plan?.weeks.find((week) => week.weekNumber === plan.currentWeek)
+    const required = currentWeek?.workouts.filter((workout) => !workout.optional) ?? []
+    const completed = required.filter((workout) => workout.status === 'completed')
+    const feedbackLabels = { easier: 'Makkelijker dan verwacht', as_expected: 'Zoals verwacht', harder: 'Zwaarder dan verwacht', not_good: 'Niet goed gegaan' } as const
+    const planWorkouts = plan?.weeks.flatMap((week) => week.workouts) ?? []
+    const checkedWorkouts = new Set(planWorkouts.filter((workout) => workout.feedback).map((workout) => workout.id))
+    const feedbackEntries = [
+      ...activities.filter((activity) => !activity.plannedWorkoutId || !checkedWorkouts.has(activity.plannedWorkoutId))
+        .flatMap((activity) => activity.effort || activity.note?.trim() ? [{
+        date: activity.startedAt,
+        effort: activity.effort,
+        note: activity.note,
+        context: activity.distanceKm ? activity.distanceKm.toFixed(1).replace('.', ',') + ' km' : activity.durationMinutes + ' min',
+      }] : []),
+      ...planWorkouts.flatMap((workout) => workout.feedback?.effort || workout.feedback?.note?.trim() ? [{
+        date: workout.feedback.completedAt ?? workout.date,
+        effort: workout.feedback.effort,
+        note: workout.feedback.note,
+        context: workout.title,
+      }] : []),
+    ].sort((a, b) => b.date.localeCompare(a.date))
+    const latestFeedback = feedbackEntries[0]
+    const lastFeedback = latestFeedback
+      ? latestFeedback.effort ? feedbackLabels[latestFeedback.effort] : 'Korte toelichting'
+      : undefined
+    const feedbackNote = latestFeedback?.note?.trim()
+    const lastFeedbackContext = latestFeedback
+      ? dateLabelForActivity({ startedAt: latestFeedback.date }) + ' · ' + (feedbackNote ? feedbackNote.slice(0, 65) + (feedbackNote.length > 65 ? '…' : '') : latestFeedback.context)
+      : undefined
+    const lastLong = plan?.weeks.flatMap((week) => week.workouts).filter((workout) => workout.type === 'long' && workout.status === 'completed').sort((a, b) => b.date.localeCompare(a.date))[0]
+    const overdue = required.filter((workout) => workout.date < todayDateISO() && workout.status === 'planned').length
+    const risk: AthleteSummary['risk'] = overdue >= 2 ? 'red' : latestFeedback?.effort === 'harder' || latestFeedback?.effort === 'not_good' ? 'orange' : 'green'
+    const marathonDate = plan?.marathonDate ?? ''
+    return {
+      id: athleteId,
+      name: nameById.get(athleteId) ?? 'Atleet',
+      email: emailByAthleteId.get(athleteId),
+      contactEmail: contactEmailById.get(athleteId),
+      age: ageById.get(athleteId),
+      marathonDate,
+      goalTime: plan?.goalTime ?? '',
+      planLength: plan?.length ?? 16,
+      trainingDays: plan?.trainingDays ?? [2, 4, 0],
+      includeOptionalFourth: plan?.includeOptionalFourth ?? false,
+      optionalTrainingDay: plan?.optionalTrainingDay ?? 6,
+      recentRaceDistanceKm: plan?.recentRaceDistanceKm,
+      recentRaceTimeSeconds: plan?.recentRaceTimeSeconds,
+      recentWeeklyKm: plan?.recentWeeklyKm,
+      recentLongestRunKm: plan?.recentLongestRunKm,
+      currentWeek: plan?.currentWeek ?? 1,
+      phase: currentWeek ? currentWeek.phase : 'Plan nog niet gestart',
+      plannedThisWeek: required.length,
+      completedThisWeek: completed.length,
+      lastActivity: lastFeedbackContext,
+      lastFeedback,
+      lastLongRun: lastLong ? dateLabelForActivity({ startedAt: lastLong.date }) + ' · ' + (lastLong.distanceKm ? lastLong.distanceKm + ' km' : lastLong.durationMinutes + ' min') : undefined,
+      risk,
+      reason: overdue >= 2 ? 'Meerdere trainingen staan na de geplande datum nog open.' : latestFeedback?.effort === 'harder' || latestFeedback?.effort === 'not_good' ? 'De laatste training voelde zwaarder dan verwacht.' : undefined,
+      activities,
+      wellness: wellness.filter((entry) => entry.visibleToCoach),
+      coachNotes: notesByAthlete.get(athleteId) ?? [],
+      planWeeks: plan?.weeks ?? [],
+    }
+  }))
+  const suggestions = ((suggestionResult.data ?? []) as unknown as Row[]).map((row) => {
+    const athleteId = String(row.athlete_id)
+    const change = (row.suggested_change && typeof row.suggested_change === 'object' ? row.suggested_change : {}) as Row
+    const state = String(row.state) as 'pending' | 'accepted' | 'modified' | 'rejected'
+    return {
+      id: String(row.id),
+      athleteId,
+      athleteName: nameById.get(athleteId) ?? 'Atleet',
+      title: String(row.title),
+      reason: String(row.reason),
+      replacement: typeof change.description === 'string' ? change.description : undefined,
+      status: state,
+      createdAt: String(row.created_at),
+    }
+  })
+  const activities = await loadActivities(supabase, userId)
+  return {
+    profile: { id: userId, name: fullName, role: 'coach' },
+    plan: null,
+    activities,
+    wellness: [],
+    athletes: athleteData,
+    suggestions,
+  }
+}
+
+function dateLabelForActivity(activity: { startedAt: string }): string {
+  return new Intl.DateTimeFormat('nl-NL', { day: 'numeric', month: 'short' }).format(new Date(activity.startedAt.slice(0, 10) + 'T12:00:00'))
+}
+
+export async function loadDashboardData(): Promise<DashboardData> {
+  const { createServerSupabaseClient } = await import('@/lib/supabase/server')
+  const supabase = await createServerSupabaseClient()
+  const { data: authData, error: authError } = await supabase.auth.getUser()
+  if (authError || !authData.user) throw new Error('Je sessie is verlopen. Log opnieuw in.')
+  const user = authData.user
+  const { data: profileData } = await supabase.from('profiles').select('id,full_name,role,preferences').eq('id', user.id).maybeSingle()
+  let profile = profileData as unknown as Row | null
+  if (!profile) {
+    const { data: createdProfile, error } = await supabase.from('profiles').insert({ id: user.id, full_name: String(user.user_metadata.full_name ?? user.email ?? '') }).select('id,full_name,role,preferences').single()
+    if (error) throw new Error('Je profiel kan nog niet worden aangemaakt. Controleer of de databasemigratie is toegepast.')
+    profile = createdProfile as unknown as Row
+  }
+  const fullName = String(profile.full_name || user.user_metadata.full_name || user.email || 'Atleet')
+  const role = (profile.role === 'coach' ? 'coach' : 'athlete') as AppRole
+  if (role === 'coach') return loadCoachData(supabase, user.id, fullName)
+
+  const [plan, activities, wellness] = await Promise.all([loadPlan(supabase, user.id), loadActivities(supabase, user.id), loadWellness(supabase, user.id)])
+  const { data: suggestionData } = await supabase.from('coach_suggestions').select('*').eq('athlete_id', user.id).order('created_at', { ascending: false }).limit(20)
+  const suggestions = ((suggestionData ?? []) as unknown as Row[]).map((row) => ({
+    id: String(row.id),
+    athleteId: user.id,
+    athleteName: fullName,
+    title: String(row.title),
+    reason: String(row.reason),
+    status: String(row.state) as 'pending' | 'accepted' | 'modified' | 'rejected',
+    createdAt: String(row.created_at),
+  }))
+  return {
+    profile: { id: user.id, name: fullName, role, email: user.email, contactEmail: athleteProfileContactEmail(profile.preferences), age: athleteProfileAge(profile.preferences) },
+    plan,
+    activities,
+    wellness,
+    athletes: [],
+    suggestions,
+  }
+}
