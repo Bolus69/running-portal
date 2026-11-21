@@ -307,7 +307,6 @@ async function loadCoachData(supabase: Awaited<ReturnType<typeof import('@/lib/s
     const currentWeek = plan?.weeks.find((week) => week.id === plan.currentWeekId) ?? plan?.weeks.find((week) => week.weekNumber === plan.currentWeek)
     const required = currentWeek?.workouts.filter((workout) => !workout.optional) ?? []
     const completed = required.filter((workout) => workout.status === 'completed')
-    const latestActivity = activities[0]
     const feedbackLabels = { easier: 'Makkelijker dan verwacht', as_expected: 'Zoals verwacht', harder: 'Zwaarder dan verwacht', not_good: 'Niet goed gegaan' } as const
     const planWorkouts = plan?.weeks.flatMap((week) => week.workouts) ?? []
     const checkedWorkouts = new Set(planWorkouts.filter((workout) => workout.feedback).map((workout) => workout.id))
