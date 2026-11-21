@@ -70,93 +70,27 @@ export async function POST(request: Request) {
     raw_summary: rawSummary,
   }
 
-  let activityId: string | undefined
-  let isRetry = false
-  const { data: existing } = await supabase.from('activities')
-    .select('id')
-    .eq('athlete_id', user.id)
-    .eq('source', 'manual')
-    .contains('raw_summary', { upload_hash: uploadHash })
-    .maybeSingle()
+  const lapRows = imported.laps.map((lap, index) => ({
+    lap_order: index + 1,
+    label: lap.label.slice(0, 50),
+    elapsed_seconds: lap.durationMinutes ? Math.round(lap.durationMinutes * 60) : null,
+    distance_meters: lap.distanceKm ? Math.round(lap.distanceKm * 1000) : null,
+    average_speed_mps: lap.distanceKm && lap.movingDurationMinutes ? lap.distanceKm * 1000 / (lap.movingDurationMinutes * 60) : null,
+    average_heart_rate: lap.averageHeartRate && lap.averageHeartRate <= 240 ? lap.averageHeartRate : null,
+  })).filter((lap) => lap.elapsed_seconds || lap.distance_meters || lap.average_speed_mps || lap.average_heart_rate)
 
-  if (existing) {
-    const { data: existingLinks } = await supabase.from('activity_workout_links')
-      .select('planned_workout_id')
-      .eq('activity_id', existing.id)
-    if (existingLinks?.some((link) => link.planned_workout_id !== plannedWorkoutId)) {
-      return jsonError('Dit bestand is al aan een andere training gekoppeld.', 409)
-    }
-    const { data: updated, error } = await supabase.from('activities')
-      .update(activityValues)
-      .eq('id', existing.id)
-      .eq('athlete_id', user.id)
-      .select('id')
-      .single()
-    if (error || !updated) return jsonError('De bestaande activiteit kon niet worden bijgewerkt.', 500)
-    activityId = String(updated.id)
-    isRetry = true
-  } else {
-    const { data: inserted, error } = await supabase.from('activities')
-      .insert({ athlete_id: user.id, source: 'manual', ...activityValues })
-      .select('id')
-      .single()
-    if (error || !inserted) return jsonError('De training kon niet worden opgeslagen.', 500)
-    activityId = String(inserted.id)
-  }
-
-  const warnings: string[] = []
-  if (imported.laps.length) {
-    const { data: existingLaps } = await supabase.from('activity_laps').select('lap_order').eq('activity_id', activityId)
-    const existingLapOrders = new Set((existingLaps ?? []).map((lap) => Number(lap.lap_order)))
-    const lapRows = imported.laps.map((lap, index) => ({
-      activity_id: activityId,
-      lap_order: index + 1,
-      label: lap.label.slice(0, 50),
-      elapsed_seconds: lap.durationMinutes ? Math.round(lap.durationMinutes * 60) : null,
-      distance_meters: lap.distanceKm ? Math.round(lap.distanceKm * 1000) : null,
-      average_speed_mps: lap.distanceKm && lap.movingDurationMinutes ? lap.distanceKm * 1000 / (lap.movingDurationMinutes * 60) : null,
-      average_heart_rate: lap.averageHeartRate && lap.averageHeartRate <= 240 ? lap.averageHeartRate : null,
-    })).filter((lap) => !existingLapOrders.has(lap.lap_order) && (lap.elapsed_seconds || lap.distance_meters || lap.average_speed_mps || lap.average_heart_rate))
-    if (lapRows.length) {
-      const { error } = await supabase.from('activity_laps').insert(lapRows)
-      if (error) warnings.push('De activiteit is opgeslagen, maar de blokgegevens konden niet worden opgeslagen.')
-    }
-  }
-
-  const { error: linkError } = await supabase.from('activity_workout_links').insert({
-    activity_id: activityId,
-    planned_workout_id: plannedWorkoutId,
-    match_method: 'manual',
-    confidence: 1,
+  const { data, error } = await supabase.rpc('import_fit_workout', {
+    p_workout_id: plannedWorkoutId,
+    p_activity: activityValues,
+    p_laps: lapRows,
   })
-  let linked = !linkError
-  if (linkError) {
-    const { data: existingLink } = await supabase.from('activity_workout_links')
-      .select('id')
-      .eq('activity_id', activityId)
-      .eq('planned_workout_id', plannedWorkoutId)
-      .maybeSingle()
-    linked = Boolean(existingLink)
-    if (!linked) warnings.push('De activiteit is opgeslagen, maar kon niet aan de training worden gekoppeld.')
+  if (error) {
+    if (error.code === '23505') return jsonError('Dit bestand is al aan een andere training gekoppeld.', 409)
+    if (error.code === '42501') return jsonError('Deze training hoort niet bij jouw schema.', 403)
+    return jsonError('De training kon niet worden opgeslagen. Probeer het opnieuw.', 500)
   }
-
-  if (linked) {
-    const { error } = await supabase.from('workout_feedback').upsert({
-      planned_workout_id: plannedWorkoutId,
-      athlete_id: user.id,
-      activity_id: activityId,
-      state: 'completed',
-      effort: effort ?? null,
-      note: note || null,
-      completed_at: imported.startedAt,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'planned_workout_id,athlete_id' })
-    if (error) warnings.push('De activiteit is gekoppeld, maar de feedback kon niet worden bijgewerkt.')
-  }
-
-  return Response.json({
-    ok: true,
-    activityId,
-    warning: warnings.length ? warnings.join(' ') : undefined,
-  }, { status: isRetry ? 200 : 201, headers: { 'Cache-Control': 'no-store' } })
+  return Response.json({ ok: true, activityId: data.activityId }, {
+    status: data.isRetry ? 200 : 201,
+    headers: { 'Cache-Control': 'no-store' },
+  })
 }

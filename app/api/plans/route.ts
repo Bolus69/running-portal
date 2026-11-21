@@ -99,6 +99,8 @@ export async function POST(request: Request) {
         step_type: step.kind,
         label: step.label,
         duration_minutes: step.durationMinutes ?? null,
+        duration_seconds: step.durationSeconds ?? null,
+        all4running_zone: step.all4runningZone ? String(step.all4runningZone) : null,
         repeats: step.repeats ?? null,
         intensity: step.intensity ?? null,
       }))

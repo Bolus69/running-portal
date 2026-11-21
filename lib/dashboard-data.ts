@@ -184,6 +184,8 @@ async function loadPlan(supabase: Awaited<ReturnType<typeof import('@/lib/supaba
         label: String(step.label),
         durationMinutes: Number(step.duration_minutes) === 1 && (step.label === 'Persoonlijk marathontempo' || step.label === 'Rustige duur (Z1)')
           ? undefined : numberValue(step.duration_minutes),
+        durationSeconds: numberValue(step.duration_seconds) ?? (step.step_type === 'strides' && step.label === 'Korte versnellingen' ? 15 : undefined),
+        all4runningZone: step.all4running_zone ? (String(step.all4running_zone) === '4-5' ? '4-5' as const : Number(step.all4running_zone) as 1 | 2 | 3 | 4 | 5) : undefined,
         repeats: numberValue(step.repeats),
         intensity: typeof step.intensity === 'string' ? step.intensity as 'E' | 'M' | 'T' | 'I' | 'R' : undefined,
       }))

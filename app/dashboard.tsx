@@ -6,6 +6,7 @@ import { LogoMark } from '@/components/logo'
 import { BRAND } from '@/lib/brand'
 import { calculateTrainingPaces, currentWeekNumber, formatPace, generatePlan, getPlanStartDate, nextMondayDate, parseDurationToSeconds, phaseLabel } from '@/lib/training-plan'
 import { todayDateISO } from '@/lib/dates'
+import { workoutProgress } from '@/lib/workout-progress'
 import type { PlanWeek } from '@/lib/training-plan'
 import type { ActivityLap, AppRole, AthleteSummary, CoachNote, CoachSuggestion, DashboardData, RunActivity, WellnessEntry } from '@/lib/types'
 
@@ -291,8 +292,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
 
   const plan = data.plan
   const activeWeek = useMemo(() => plan?.weeks.find((week) => week.id === plan.currentWeekId) ?? plan?.weeks.find((week) => week.weekNumber === plan.currentWeek) ?? plan?.weeks[0] ?? null, [plan])
-  const completedThisWeek = activeWeek?.workouts.filter((workout) => workout.status === 'completed').length ?? 0
-  const requiredThisWeek = activeWeek?.workouts.filter((workout) => !workout.optional).length ?? 0
+  const { completed: completedThisWeek, required: requiredThisWeek, optionalCompleted } = workoutProgress(activeWeek?.workouts ?? [])
   const progress = requiredThisWeek > 0 ? Math.round((completedThisWeek / requiredThisWeek) * 100) : 0
   const nextTraining = activeWeek?.workouts.find((workout) => workout.status === 'planned' && !workout.optional)
   const profileAthlete = data.athletes.find((athlete) => athlete.id === profileAthleteId) ?? null
@@ -855,7 +855,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
             {plan && activeWeek ? <>
               <section className="week-hero">
                 <div className="week-hero-content"><div className="week-topline"><span className="phase-pill"><i /> {phaseLabel(activeWeek.phase)}</span><span className="week-label">WEEK {String(activeWeek.weekNumber).padStart(2, '0')} <span>/{plan.length}</span></span></div><h2>Stap voor stap<br /><em>naar de start.</em></h2><p>{activeWeek.goal}</p><div className="hero-meta"><span><Icon name="runner" size={17} /> Marathon {dateLabel(plan.marathonDate, { day: 'numeric', month: 'short', year: 'numeric' })}</span><span className="hero-meta-divider" /><span>Doel <b>{formatTime(plan.goalTime)}</b></span></div></div>
-                <div className="week-ring-wrap"><div className="week-ring" style={{ '--progress': progress + '%' } as React.CSSProperties}><span>{completedThisWeek}<small>/{requiredThisWeek}</small></span></div><div><strong>trainingen</strong><span>deze week gedaan</span></div></div>
+                <div className="week-ring-wrap"><div className="week-ring" style={{ '--progress': progress + '%' } as React.CSSProperties}><span>{completedThisWeek}<small>/{requiredThisWeek}</small></span></div><div><strong>vaste trainingen</strong><span>deze week gedaan{optionalCompleted > 0 ? ` · +${optionalCompleted} optioneel` : ''}</span></div></div>
                 <a className="hero-photo-credit" href="https://unsplash.com/photos/a-large-group-of-runners-participating-in-a-marathon-race-fW-drUfhcwc" target="_blank" rel="noreferrer" aria-label="Foto van Daniel Stiel via Unsplash">Foto Daniel Stiel / Unsplash</a>
               </section>
 
@@ -1046,7 +1046,7 @@ function PlanView({ role, athleteName, plan, activities, onWorkout, expandedWork
               <span className="plan-week-number">{String(week.weekNumber).padStart(2, '0')}</span>
               <span className="plan-week-copy"><strong>{phaseLabel(week.phase)}{week.historical ? ' · Eerdere planning' : ''}</strong><small>{week.goal}</small></span>
               {week.isRecoveryWeek && <span className="recovery-tag">Herstelweek</span>}
-              <span className="plan-week-count">{week.workouts.filter((item) => item.status === 'completed').length}/{week.workouts.filter((item) => !item.optional).length}<Icon name="chevron" size={17} /></span>
+              <span className="plan-week-count">{workoutProgress(week.workouts).completed}/{workoutProgress(week.workouts).required}{workoutProgress(week.workouts).optionalCompleted > 0 ? ` · +${workoutProgress(week.workouts).optionalCompleted} optioneel` : ''}<Icon name="chevron" size={17} /></span>
             </summary>
             <div className="plan-week-workouts">
               {week.workouts.map((workout) => {
@@ -1062,7 +1062,7 @@ function PlanView({ role, athleteName, plan, activities, onWorkout, expandedWork
                   {workout.feedback && <div className="workout-feedback-inline plan-row-feedback"><strong>Jouw terugkoppeling</strong>{workout.feedback.effort && <span>{effortLabel(workout.feedback.effort)}</span>}{workout.feedback.note && <p>{workout.feedback.note}</p>}</div>}
                   {expandedWorkout === workout.id && <div className="plan-row-detail">
                     <p>{workout.description}</p>
-                    <div>{workout.steps.map((step, index) => <span key={index}>{step.label}{step.repeats ? ' · ' + step.repeats + '×' : ''}{step.durationMinutes ? ' · ' + step.durationMinutes + ' min' : ''}</span>)}</div>
+                    <div>{workout.steps.map((step, index) => <span key={index}>{step.label}{step.repeats ? ' · ' + step.repeats + '×' : ''}{step.durationSeconds ? ' · ' + step.durationSeconds + ' sec' : step.durationMinutes ? ' · ' + step.durationMinutes + ' min' : ''}</span>)}</div>
                     {workout.status === 'completed' && <div className="workout-actions"><button type="button" className="button button-outline button-small" onClick={() => onEnterWorkout(workout)}>{workout.feedback?.effort || workout.feedback?.note ? 'Feedback aanpassen' : 'Feedback toevoegen'}</button></div>}
                     {canEnterNow && <div className="workout-actions"><button type="button" className="button button-primary button-small" onClick={() => onEnterWorkout(workout)}><Icon name="check" size={15} />{workout.status === 'skipped' ? 'Toch uitgevoerd? Invullen' : workout.date < today ? 'Training alsnog invullen' : 'Training afronden'}</button></div>}
                   </div>}
@@ -1117,7 +1117,7 @@ function buildPlanExportHtml(plan: NonNullable<DashboardData['plan']>, athleteNa
       const workload = workout.durationMinutes ? workout.durationMinutes + ' min' : workout.distanceKm ? workout.distanceKm + ' km' : 'Duur niet opgegeven'
       const intensity = paceIntensityLabel(workout.intensity)
       const stepsHtml = workout.steps?.length
-        ? '<ul class="steps">' + workout.steps.map((step) => '<li>' + esc(step.label + (step.repeats ? ' · ' + step.repeats + '×' : '') + (step.durationMinutes ? ' · ' + step.durationMinutes + ' min' : '') + (step.intensity ? ' · ' + paceIntensityLabel(step.intensity) : '')) + '</li>').join('') + '</ul>'
+        ? '<ul class="steps">' + workout.steps.map((step) => '<li>' + esc(step.label + (step.repeats ? ' · ' + step.repeats + '×' : '') + (step.durationSeconds ? ' · ' + step.durationSeconds + ' sec' : step.durationMinutes ? ' · ' + step.durationMinutes + ' min' : '') + (step.intensity ? ' · ' + paceIntensityLabel(step.intensity) : '')) + '</li>').join('') + '</ul>'
         : ''
       return '<article class="workout"><div class="workout-heading"><div><h3>' + esc(workoutTitleLabel(workout.title)) + (workout.optional ? ' <span class="optional">Optioneel</span>' : '') + '</h3><p class="workout-date">' + esc(dateLabel(workout.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })) + '</p></div><strong class="workload">' + esc(workload) + '</strong></div>' +
         (intensity ? '<p class="intensity">' + esc(intensity) + '</p>' : '') +
@@ -1178,7 +1178,7 @@ function buildPlanWordHtml(plan: NonNullable<DashboardData['plan']>, athleteName
       const optional = workout.optional ? ' · OPTIONEEL' : ''
       const stepsHtml = workout.steps?.length
         ? '<tr><td colspan="2" style="padding:1pt 8pt 8pt 8pt"><p style="margin:0 0 3pt 0;font-size:8pt;font-weight:bold;color:#63798b">BLOKKEN</p>' +
-          workout.steps.map((step) => '<p style="margin:1pt 0;font-size:9pt;color:#456176">• ' + esc(step.label + (step.repeats ? ' · ' + step.repeats + '×' : '') + (step.durationMinutes ? ' · ' + step.durationMinutes + ' min' : '') + (step.intensity ? ' · ' + paceIntensityLabel(step.intensity) : '')) + '</p>').join('') +
+          workout.steps.map((step) => '<p style="margin:1pt 0;font-size:9pt;color:#456176">• ' + esc(step.label + (step.repeats ? ' · ' + step.repeats + '×' : '') + (step.durationSeconds ? ' · ' + step.durationSeconds + ' sec' : step.durationMinutes ? ' · ' + step.durationMinutes + ' min' : '') + (step.intensity ? ' · ' + paceIntensityLabel(step.intensity) : '')) + '</p>').join('') +
           '</td></tr>'
         : ''
       return '<table width="100%" border="0" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;page-break-inside:avoid;margin:0">' +
@@ -1515,9 +1515,9 @@ function AthleteDetail({ athlete, onBack, onSetupPlan, onAddNote, profileContent
       {planWeeks.length > 0 ? <section className="coach-plan-timeline">
         <div className="section-heading"><div><p className="eyebrow">PLANNING</p><h2>Volledig trainingsplan</h2></div></div>
         <div className="plan-week-list">{planWeeks.map((week) => {
-          const completed = week.workouts.filter((workout) => workout.status === 'completed').length
+          const { completed, required, optionalCompleted } = workoutProgress(week.workouts)
           return <details className="plan-week" key={week.weekNumber} open={week.weekNumber === athlete.currentWeek}>
-            <summary><span className="plan-week-number">{String(week.weekNumber).padStart(2, '0')}</span><span className="plan-week-copy"><strong>Week {week.weekNumber} · {phaseLabel(week.phase)}{week.isRecoveryWeek ? ' · Herstelweek' : ''}</strong><small>{week.goal}</small></span><span className="plan-week-count">{completed}/{week.workouts.length}<Icon name="chevron" size={16} /></span></summary>
+            <summary><span className="plan-week-number">{String(week.weekNumber).padStart(2, '0')}</span><span className="plan-week-copy"><strong>Week {week.weekNumber} · {phaseLabel(week.phase)}{week.isRecoveryWeek ? ' · Herstelweek' : ''}</strong><small>{week.goal}</small></span><span className="plan-week-count">{completed}/{required}{optionalCompleted > 0 ? ` · +${optionalCompleted} optioneel` : ''}<Icon name="chevron" size={16} /></span></summary>
             <div className="plan-week-workouts">{week.workouts.map((workout) => <div key={workout.id}><div className="plan-row"><div className="plan-row-main"><span className={'workout-type-icon type-' + workout.type}><Icon name={workoutIconName(workout.type)} size={18} /></span><span className="plan-row-copy"><span className="plan-row-date">{dateLabel(workout.date)}</span><strong>{workoutTitleLabel(workout.title)}{workout.optional && <span className="optional-tag"> Optioneel</span>}</strong></span></div><span className="plan-row-duration">{workout.durationMinutes ? workout.durationMinutes + ' min' : workout.distanceKm + ' km'}</span><StatusPill status={workout.status} /></div><div className="plan-row-detail">{workout.goal}{workout.intensity ? ' · ' + paceIntensityLabel(workout.intensity) : ''}</div>{(workout.feedback?.effort || workout.feedback?.note) && <div className="coach-workout-feedback"><strong>Atleetfeedback</strong>{workout.feedback.effort && <span>{effortLabel(workout.feedback.effort)}</span>}{workout.feedback.note && <p>{workout.feedback.note}</p>}{workout.feedback.completedAt && <small>Ingevuld {dateLabel(workout.feedback.completedAt)}</small>}</div>}{recent.filter((activity) => activity.plannedWorkoutId === workout.id).slice(0, 1).map((activity) => <LinkedActivitySummary key={activity.id} activity={activity} />)}</div>)}</div>
           </details>
         })}</div>
