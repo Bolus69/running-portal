@@ -13,7 +13,7 @@ type View = 'week' | 'plan' | 'history' | 'wellness' | 'profile' | 'coach' | 'at
 type ManualDraft = { name: string; date: string; duration: string; distance: string; heartRate: string; effort: string; note: string; plannedWorkoutId: string }
 type QuickFeedbackDraft = { effort: NonNullable<RunActivity['effort']> | ''; note: string }
 type WellnessDraft = { sleepHours: string; restingHeartRate: string; recoveryScore: string; note: string }
-type AthleteIdentityDraft = { name: string; age: string }
+type AthleteIdentityDraft = { name: string; email: string; age: string }
 type ProfileDraft = { marathonDate: string; goalTime: string; planLength: 12 | 16 | 20; days: number[]; optional: boolean; optionalTrainingDay: number; raceTime: string; raceDistance: string; recentWeeklyKm: string; recentLongestRunKm: string }
 
 const TRAINING_DAYS = [{ value: 1, label: 'Ma' }, { value: 2, label: 'Di' }, { value: 3, label: 'Wo' }, { value: 4, label: 'Do' }, { value: 5, label: 'Vr' }, { value: 6, label: 'Za' }, { value: 0, label: 'Zo' }]
@@ -242,7 +242,7 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
   const [draft, setDraft] = useState<ManualDraft>({ name: '', date: todayDateISO(), duration: '', distance: '', heartRate: '', effort: '', note: '', plannedWorkoutId: '' })
   const [lapDrafts, setLapDrafts] = useState<ActivityLap[]>([])
   const [wellnessDraft, setWellnessDraft] = useState<WellnessDraft>({ sleepHours: '', restingHeartRate: '', recoveryScore: '', note: '' })
-  const [identityDraft, setIdentityDraft] = useState<AthleteIdentityDraft>({ name: initialData.profile.name, age: initialData.profile.age ? String(initialData.profile.age) : '' })
+  const [identityDraft, setIdentityDraft] = useState<AthleteIdentityDraft>({ name: initialData.profile.name, email: initialData.profile.contactEmail ?? initialData.profile.email ?? '', age: initialData.profile.age ? String(initialData.profile.age) : '' })
   const [profileDraft, setProfileDraft] = useState<ProfileDraft>({ marathonDate: initialData.plan?.marathonDate ?? '', goalTime: initialData.plan?.goalTime ?? '', planLength: initialData.plan?.length ?? 16, days: initialData.plan?.trainingDays ?? [2, 4, 0], optional: initialData.plan?.includeOptionalFourth ?? false, optionalTrainingDay: initialData.plan?.optionalTrainingDay ?? 6, raceTime: raceTimeInput(initialData.plan?.recentRaceTimeSeconds), raceDistance: initialData.plan?.recentRaceDistanceKm ? String(initialData.plan.recentRaceDistanceKm) : '', recentWeeklyKm: initialData.plan?.recentWeeklyKm ? String(initialData.plan.recentWeeklyKm) : '', recentLongestRunKm: initialData.plan?.recentLongestRunKm ? String(initialData.plan.recentLongestRunKm) : '' })
   const [coachPlanDraft, setCoachPlanDraft] = useState<ProfileDraft>({ marathonDate: '', goalTime: '04:00:00', planLength: 16, days: [2, 4, 0], optional: false, optionalTrainingDay: 6, raceTime: '', raceDistance: '', recentWeeklyKm: '', recentLongestRunKm: '' })
 
@@ -481,12 +481,14 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
     event.preventDefault()
     const name = identityDraft.name.trim()
     if (!name || name.length > 80) return showToast('Vul een naam in van maximaal 80 tekens.')
+    const email = identityDraft.email.trim().toLowerCase()
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) return showToast('Vul een geldig e-mailadres in.')
     const age = identityDraft.age.trim() ? Number(identityDraft.age) : undefined
     if (age !== undefined && (!Number.isInteger(age) || age < 1 || age > 120)) return showToast('Vul een leeftijd tussen 1 en 120 jaar in, of laat het veld leeg.')
 
     if (!demoMode) {
       try {
-        const response = await fetch('/api/athlete/profile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, age: age ?? null }) })
+        const response = await fetch('/api/athlete/profile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email, age: age ?? null }) })
         const result = await response.json().catch(() => ({})) as { error?: string }
         if (!response.ok) return showToast(result.error ?? 'Je profielgegevens konden niet worden opgeslagen.')
       } catch {
@@ -496,10 +498,10 @@ export function Dashboard({ initialData, demoMode }: { initialData: DashboardDat
 
     setData((current) => ({
       ...current,
-      profile: { ...current.profile, name, age },
-      athletes: current.athletes.map((athlete) => athlete.id === current.profile.id ? { ...athlete, name, age } : athlete),
+      profile: { ...current.profile, name, contactEmail: email, age },
+      athletes: current.athletes.map((athlete) => athlete.id === current.profile.id ? { ...athlete, name, contactEmail: email, age } : athlete),
     }))
-    setIdentityDraft({ name, age: age === undefined ? '' : String(age) })
+    setIdentityDraft({ name, email, age: age === undefined ? '' : String(age) })
     showToast('Profielgegevens opgeslagen.')
   }
 
@@ -1389,8 +1391,8 @@ function AthleteIdentityForm({ data, draft, setDraft, onSubmit }: { data: Dashbo
   return <section className="profile-form-card athlete-personal-card">
     <div className="section-heading"><div><p className="eyebrow">PERSOONLIJKE GEGEVENS</p><h2>Mijn gegevens</h2></div><span className="profile-avatar">{draft.name.charAt(0) || 'A'}</span></div>
     <form className="form-grid" onSubmit={onSubmit}>
-      <label className="field"><span>Naam</span><input required maxLength={80} value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} placeholder="Je naam" /></label>
-      <label className="field"><span>E-mailadres <small>account</small></span><input type="email" readOnly value={data.profile.email ?? ''} placeholder="Niet beschikbaar" /></label>
+      <label className="field"><span>Volledige naam</span><input required maxLength={80} value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} placeholder="Voor- en achternaam" /></label>
+      <label className="field full"><span>Contact e-mailadres <small>zichtbaar voor je coach</small></span><input type="email" required maxLength={254} value={draft.email} onChange={(event) => setDraft({ ...draft, email: event.target.value })} placeholder="naam@voorbeeld.nl" /><small className="plan-context-hint">Dit is je contactadres voor de coach. Je inlogadres blijft ongewijzigd.</small></label>
       <label className="field"><span>Leeftijd <small>jaar · optioneel</small></span><input type="number" min={1} max={120} step={1} value={draft.age} onChange={(event) => setDraft({ ...draft, age: event.target.value })} placeholder="Bijv. 35" /></label>
       <div className="form-actions full"><button className="button button-primary">Gegevens opslaan</button></div>
     </form>
@@ -1437,7 +1439,7 @@ function ProfileView({ data, role, athletes, selectedAthlete, onSelectAthlete, d
         <details className="zone-reference talk-test-reference"><summary><span className="talk-test-summary"><span className="aside-icon lime"><Icon name="spark" size={17} /></span><span><strong>Praattempo</strong><small>Open voor uitleg over je inspanning</small></span></span><Icon name="chevron" size={18} /></summary><div className="talk-test-content"><p>Gebruik je ademhaling naast tempo en hartslag om je inspanning in te schatten.</p><TalkTestGuide /><small className="talk-test-note">Een praktische richtlijn; wind, warmte en vermoeidheid tellen ook mee.</small></div></details>
         <details className="zone-reference"><summary><span><strong>Hartslagzones</strong><small>Open voor uitleg bij de zone-indeling</small></span><Icon name="chevron" size={18} /></summary><div className="zone-reference-list"><div><b>Z1</b><span><strong>Rustig</strong><small>&lt;75% · makkelijk praten</small></span></div><div><b>Z2</b><span><strong>Gecontroleerd</strong><small>75–82% · zinnen worden korter</small></span></div><div><b>Z3</b><span><strong>Vlot / stevig</strong><small>82–88% · korte zinnen</small></span></div><div><b>Z4</b><span><strong>Intensief</strong><small>89–92% · enkele woorden</small></span></div><div><b>Z5</b><span><strong>Korte versnelling</strong><small>&gt;92% · zwaar hijgen</small></span></div></div><p className="zone-note">Percentages zijn een richtlijn op basis van maximale hartslag. Gebruik ook je ademhaling en ervaren inspanning; hartslag hoeft niet ingevuld te zijn.</p><a className="zone-source" href="https://all4running.nl/blog/app/uploads/2025/05/HardloopschemaMarathonGevorderd.pdf" target="_blank" rel="noreferrer">Bekijk de bron van deze zone-indeling <span>↗</span></a></details>
         <details className="zone-reference pace-reference"><summary><span><strong>Tempozones</strong><small>Open voor jouw tempo-indicaties</small></span><Icon name="chevron" size={18} /></summary><div className="pace-preview"><div><span className="small-label">TEMPO-INDICATIES</span><span className="pace-preview-note">Richtlijnen op basis van je recente wedstrijd en marathondoel. Zie ze als startpunt; pas aan op gevoel en omstandigheden.</span></div>{paces ? <div className="pace-preview-grid"><span><small>Rustige duur</small><b>{formatPace(paces.easy[0])}–{formatPace(paces.easy[1])} /km</b></span><span><small>Marathontempo</small><b>{formatPace(paces.marathon)} /km</b></span><span><small>Stevig tempo</small><b>{formatPace(paces.threshold[0])}–{formatPace(paces.threshold[1])} /km</b></span><span><small>Intervaltempo</small><b>{formatPace(paces.interval[0])}–{formatPace(paces.interval[1])} /km</b></span></div> : <p className="muted">Vul links een recente wedstrijdafstand en -tijd in, bijvoorbeeld 10 km in 50:00.</p>}</div></details>
-        <div className="profile-footnote"><Icon name="shield" size={16} /><span>Je account en trainingsgegevens zijn alleen zichtbaar volgens de coach-atleettoewijzing.</span></div>
+        {role !== 'athlete' && <div className="profile-footnote"><Icon name="shield" size={16} /><span>Je account en trainingsgegevens zijn alleen zichtbaar volgens de coach-atleettoewijzing.</span></div>}
       </aside>
     </div>
   )
@@ -1473,7 +1475,7 @@ function SuggestionsView({ suggestions, onUpdate, onEvaluate, evaluating }: { su
 function AthleteIdentitySummary({ athlete }: { athlete: AthleteSummary }) {
   return <section className="athlete-identity-card">
     <div className="section-heading"><div><p className="eyebrow">PERSOONLIJKE GEGEVENS</p><h2>{athlete.name}</h2></div><span className="athlete-avatar">{athlete.name.split(' ').map((part) => part[0]).slice(0, 2).join('')}</span></div>
-    <div className="athlete-identity-grid"><div><small>E-mailadres</small><strong>{athlete.email || 'Niet beschikbaar'}</strong></div><div><small>Leeftijd</small><strong>{athlete.age ? athlete.age + ' jaar' : 'Nog niet ingevuld'}</strong></div></div>
+    <div className="athlete-identity-grid"><div><small>Contact e-mailadres</small><strong>{athlete.contactEmail || 'Nog niet ingevuld'}</strong></div><div><small>Account e-mailadres</small><strong>{athlete.email || 'Niet beschikbaar'}</strong></div><div><small>Leeftijd</small><strong>{athlete.age ? athlete.age + ' jaar' : 'Nog niet ingevuld'}</strong></div></div>
   </section>
 }
 

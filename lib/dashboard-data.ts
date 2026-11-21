@@ -20,6 +20,14 @@ function athleteProfileAge(value: unknown): number | undefined {
   return Number.isInteger(age) && age >= 1 && age <= 120 ? age : undefined
 }
 
+function athleteProfileContactEmail(value: unknown): string | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const athleteProfile = (value as Row).athleteProfile
+  if (!athleteProfile || typeof athleteProfile !== 'object' || Array.isArray(athleteProfile)) return undefined
+  const email = (athleteProfile as Row).contactEmail
+  return typeof email === 'string' && email.trim() ? email.trim() : undefined
+}
+
 function timeLabel(secondsValue: unknown): string {
   const seconds = Math.round(numberValue(secondsValue) ?? 0)
   const hours = Math.floor(seconds / 3600)
@@ -285,6 +293,10 @@ async function loadCoachData(supabase: Awaited<ReturnType<typeof import('@/lib/s
     const age = athleteProfileAge(profile.preferences)
     return age === undefined ? [] : [[String(profile.id), age] as const]
   }))
+  const contactEmailById = new Map(profiles.flatMap((profile) => {
+    const email = athleteProfileContactEmail(profile.preferences)
+    return email ? [[String(profile.id), email] as const] : []
+  }))
   const notesByAthlete = new Map<string, { id: string; note: string; createdAt: string }[]>()
   for (const row of (noteResult.data ?? []) as unknown as Row[]) {
     const athleteId = String(row.athlete_id)
@@ -327,6 +339,7 @@ async function loadCoachData(supabase: Awaited<ReturnType<typeof import('@/lib/s
       id: athleteId,
       name: nameById.get(athleteId) ?? 'Atleet',
       email: emailByAthleteId.get(athleteId),
+      contactEmail: contactEmailById.get(athleteId),
       age: ageById.get(athleteId),
       marathonDate,
       goalTime: plan?.goalTime ?? '',
@@ -412,7 +425,7 @@ export async function loadDashboardData(): Promise<DashboardData> {
     createdAt: String(row.created_at),
   }))
   return {
-    profile: { id: user.id, name: fullName, role, email: user.email, age: athleteProfileAge(profile.preferences) },
+    profile: { id: user.id, name: fullName, role, email: user.email, contactEmail: athleteProfileContactEmail(profile.preferences), age: athleteProfileAge(profile.preferences) },
     plan,
     activities,
     wellness,

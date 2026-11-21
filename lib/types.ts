@@ -33,6 +33,7 @@ export type AthleteSummary = {
   id: string
   name: string
   email?: string
+  contactEmail?: string
   age?: number
   marathonDate: string
   goalTime: string
@@ -81,7 +82,7 @@ export type WellnessEntry = {
 }
 
 export type DashboardData = {
-  profile: { id: string; name: string; role: AppRole; email?: string; age?: number }
+  profile: { id: string; name: string; role: AppRole; email?: string; contactEmail?: string; age?: number }
   plan: {
     length: PlanLength
     marathonDate: string

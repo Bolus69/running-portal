@@ -14,10 +14,12 @@ export async function POST(request: Request) {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return jsonError('Log opnieuw in om je gegevens op te slaan.', 401)
 
-  let body: { name?: unknown; age?: unknown }
-  try { body = await request.json() as { name?: unknown; age?: unknown } } catch { return jsonError('Controleer de ingevulde gegevens.', 400) }
+  let body: { name?: unknown; email?: unknown; age?: unknown }
+  try { body = await request.json() as { name?: unknown; email?: unknown; age?: unknown } } catch { return jsonError('Controleer de ingevulde gegevens.', 400) }
   const name = typeof body.name === 'string' ? body.name.trim() : ''
   if (!name || name.length > 80) return jsonError('Vul een naam in van maximaal 80 tekens.', 400)
+  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
+  if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return jsonError('Vul een geldig contact e-mailadres in.', 400)
 
   let age: number | null = null
   if (body.age !== undefined && body.age !== null && body.age !== '') {
@@ -32,7 +34,7 @@ export async function POST(request: Request) {
 
   const preferences = objectValue(profile.preferences)
   const athleteProfile = objectValue(preferences.athleteProfile)
-  const nextPreferences = { ...preferences, athleteProfile: { ...athleteProfile, age } }
+  const nextPreferences = { ...preferences, athleteProfile: { ...athleteProfile, contactEmail: email, age } }
   const { data: saved, error: saveError } = await supabase.from('profiles')
     .update({ full_name: name, preferences: nextPreferences, updated_at: new Date().toISOString() })
     .eq('id', user.id)
@@ -40,5 +42,5 @@ export async function POST(request: Request) {
     .single()
   if (saveError || !saved) return jsonError('Je profielgegevens konden niet worden opgeslagen.', 500)
 
-  return Response.json({ ok: true, profile: { id: saved.id, name: saved.full_name, email: user.email, age } }, { headers: { 'Cache-Control': 'no-store' } })
+  return Response.json({ ok: true, profile: { id: saved.id, name: saved.full_name, email: user.email, contactEmail: email, age } }, { headers: { 'Cache-Control': 'no-store' } })
 }
