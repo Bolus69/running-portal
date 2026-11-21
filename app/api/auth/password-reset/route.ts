@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { isSameOriginRequest } from '@/lib/http'
+import { appOrigin } from '@/lib/app-origin'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 function redirectToForm(request: Request, query: string, email?: string) {
@@ -29,21 +30,7 @@ export async function POST(request: Request) {
       return redirectToForm(request, 'error=local', email)
     }
     const supabase = await createServerSupabaseClient()
-    const configuredPreviewUrl = process.env.VERCEL_ENV === 'preview'
-      ? process.env.STRAVA_WEBHOOK_CALLBACK_ORIGIN || process.env.NEXT_PUBLIC_APP_URL
-      : undefined
-    let callbackOrigin = requestUrl.origin
-    if (configuredPreviewUrl) {
-      try {
-        const previewUrl = new URL(configuredPreviewUrl)
-        if (previewUrl.protocol === 'https:') callbackOrigin = previewUrl.origin
-      } catch {
-        // Keep the request origin when the optional Preview URL is invalid.
-      }
-    }
-    // Reuse the exact callback URL already allowed in Supabase for athlete invitations.
-    // A different path can fall back to Supabase's Site URL (which is localhost here).
-    const redirectTo = new URL('/auth/accept', callbackOrigin).toString()
+    const redirectTo = new URL('/auth/accept', appOrigin(request.url)).toString()
     const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo })
     if (error) return redirectToForm(request, 'error=temporary', email)
     return redirectToForm(request, 'sent=1')

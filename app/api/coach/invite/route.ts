@@ -1,6 +1,7 @@
 import { createAdminSupabaseClient } from '@/lib/supabase/admin'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { isSameOriginRequest, jsonError } from '@/lib/http'
+import { appOrigin } from '@/lib/app-origin'
 
 export async function POST(request: Request) {
   if (!isSameOriginRequest(request)) return jsonError('Ongeldig verzoek.', 403)
@@ -26,20 +27,7 @@ export async function POST(request: Request) {
   )
   if (coachRoleError) return jsonError('Je coachrechten konden niet worden klaargezet. Probeer het later opnieuw.', 503)
 
-  const requestOrigin = new URL(request.url).origin
-  const configuredPreviewUrl = process.env.VERCEL_ENV === 'preview'
-    ? process.env.STRAVA_WEBHOOK_CALLBACK_ORIGIN || process.env.NEXT_PUBLIC_APP_URL
-    : undefined
-  let callbackOrigin = requestOrigin
-  if (configuredPreviewUrl) {
-    try {
-      const previewUrl = new URL(configuredPreviewUrl)
-      if (previewUrl.protocol === 'https:') callbackOrigin = previewUrl.origin
-    } catch {
-      // Keep the request origin when the optional Preview URL is invalid.
-    }
-  }
-  const callback = new URL('/auth/accept', callbackOrigin).toString()
+  const callback = new URL('/auth/accept', appOrigin(request.url)).toString()
   const { data: invitation, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, { data: { full_name: name }, redirectTo: callback })
   const athleteId = invitation.user?.id
   if (inviteError || !athleteId) return jsonError('De uitnodiging kon niet worden verstuurd. Controleer of het adres al een account heeft.', 409)

@@ -15,7 +15,7 @@ export default async function ForgotPasswordPage({ searchParams }: { searchParam
   const config = getSupabasePublicConfig()
   const initialEmail = typeof email === 'string' ? email.slice(0, 254) : ''
   let previewLoginUrl: string | undefined
-  const previewOrigin = process.env.STRAVA_WEBHOOK_CALLBACK_ORIGIN || process.env.NEXT_PUBLIC_APP_URL
+  const previewOrigin = process.env.APP_ORIGIN || process.env.NEXT_PUBLIC_APP_URL
   if (previewOrigin) {
     try {
       const parsedOrigin = new URL(previewOrigin)

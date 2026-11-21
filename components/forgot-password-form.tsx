@@ -34,7 +34,7 @@ export function ForgotPasswordForm({
     const hostname = window.location.hostname
     if (['localhost', '127.0.0.1', '::1', '[::1]'].includes(hostname)) {
       setLocalBlocked(true)
-      setErrorMessage('Wachtwoordherstel is alleen beschikbaar via de online Preview-app.')
+      setErrorMessage('Wachtwoordherstel is alleen beschikbaar via de online app.')
       return
     }
 
@@ -74,7 +74,7 @@ export function ForgotPasswordForm({
       )}
       {errorMessage && <p className="login-error" role="alert">{errorMessage}</p>}
       {localBlocked && previewLoginUrl && (
-        <p className="login-help"><Link href={previewLoginUrl}>Open de online Preview-app</Link></p>
+        <p className="login-help"><Link href={previewLoginUrl}>Open de online app</Link></p>
       )}
       <button className="button button-primary full-width" type="submit" disabled={state === 'sending'}>
         {state === 'sending' ? 'Bezig met versturen…' : 'Herstel-link versturen'}
