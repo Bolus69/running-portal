@@ -182,7 +182,8 @@ async function loadPlan(supabase: Awaited<ReturnType<typeof import('@/lib/supaba
       const workoutSteps = (stepsByWorkout.get(workoutId) ?? []).map((step) => ({
         kind: String(step.step_type) as PlanWeek['workouts'][number]['steps'][number]['kind'],
         label: String(step.label),
-        durationMinutes: numberValue(step.duration_minutes),
+        durationMinutes: Number(step.duration_minutes) === 1 && (step.label === 'Persoonlijk marathontempo' || step.label === 'Rustige duur (Z1)')
+          ? undefined : numberValue(step.duration_minutes),
         repeats: numberValue(step.repeats),
         intensity: typeof step.intensity === 'string' ? step.intensity as 'E' | 'M' | 'T' | 'I' | 'R' : undefined,
       }))
@@ -212,7 +213,10 @@ async function loadPlan(supabase: Awaited<ReturnType<typeof import('@/lib/supaba
         optional: Boolean(workout.is_optional),
         feedback,
       }
-    })
+    }).filter((workout) => workout.type === 'race'
+      || workout.date < String(plan.marathon_date)
+      || workout.status === 'completed'
+      || workout.status === 'skipped')
     if (!weekWorkouts.length) return []
     return [{
       id: weekId,
